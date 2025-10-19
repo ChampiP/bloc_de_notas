@@ -78,7 +78,7 @@ def run_app():
         # Header (replacing the big framed box) to keep a cleaner look
         header_frame = ttk.Frame(root)
         header_frame.pack(fill="x", padx=8, pady=(8,0))
-        ttk.Label(header_frame, text="Gestión de Atención", font=("Segoe UI", 14, "bold")).pack(side="left")
+        # Title removed per user request (was: 'Gestión de Atención')
 
         # Move credentials buttons to the header (top-right)
         creds_frame = ttk.Frame(header_frame)
@@ -167,6 +167,54 @@ def run_app():
 
         canvas.bind("<Enter>", _bind_mousewheel_to_canvas)
         canvas.bind("<Leave>", _unbind_mousewheel_from_canvas)
+
+        # Helper: evitar que el mousewheel cambie la selección de Comboboxs cuando se scrollea
+        def disable_mousewheel_on(widget):
+            try:
+                # Ensure widget handles mousewheel first to prevent global canvas bindings from changing selection
+                # Put the widget itself at the front of its bindtags
+                current = widget.bindtags()
+                if current and current[0] != str(widget):
+                    widget.bindtags((str(widget),) + current)
+                # We'll allow wheel events only after an explicit click on the widget.
+                # Use a small per-widget flag that is set when the widget is clicked
+                # and cleared on focus out.
+                try:
+                    setattr(widget, '_wheel_enabled', False)
+                except Exception:
+                    pass
+
+                def _enable_on_click(event=None):
+                    try:
+                        setattr(widget, '_wheel_enabled', True)
+                    except Exception:
+                        pass
+
+                def _disable_on_focusout(event=None):
+                    try:
+                        setattr(widget, '_wheel_enabled', False)
+                    except Exception:
+                        pass
+
+                def _wheel_handler(event):
+                    try:
+                        if getattr(widget, '_wheel_enabled', False):
+                            # allow normal processing
+                            return None
+                    except Exception:
+                        pass
+                    return 'break'
+
+                # enable after mouse click (user explicit interaction)
+                widget.bind('<Button-1>', _enable_on_click, add='+')
+                # disable when the widget loses focus
+                widget.bind('<FocusOut>', _disable_on_focusout, add='+')
+
+                widget.bind('<MouseWheel>', _wheel_handler)
+                widget.bind('<Button-4>', _wheel_handler)
+                widget.bind('<Button-5>', _wheel_handler)
+            except Exception:
+                pass
 
         # Saludo simplificado y resaltado: "Buenas noches, Sr. {Nombre}"
         # Fondo del saludo igual al del contenedor para evitar el efecto de cuadro
@@ -411,6 +459,7 @@ def run_app():
         motivo_var = tk.StringVar(value="Selecciona motivo...")
         motivo_combo = ttk.Combobox(motivo_frame, textvariable=motivo_var, values=list(templates.keys()), state="readonly", font=("Segoe UI", 10))
         motivo_combo.pack(side="left", fill="x", expand=True)
+        disable_mousewheel_on(motivo_combo)
 
         def update_template(event=None):
             motivo = motivo_var.get()
@@ -443,7 +492,10 @@ def run_app():
                 root.update_idletasks()
                 main_w = root.winfo_width() or 324
                 main_h = root.winfo_height() or 600
-                position_modal(modal, int(main_w), int(main_h), side='right')
+                # aumentar ligeramente la altura del modal para que el botón 'Guardar' quede visible
+                # si la ventana principal es 600, forzamos al menos 700px en el modal
+                modal_h = max(700, int(main_h * 1.1))
+                position_modal(modal, int(max(324, main_w)), int(modal_h), side='right')
             except Exception:
                 pass
 
@@ -558,6 +610,7 @@ def run_app():
         tnps_var = tk.StringVar()
         tnps_combo = ttk.Combobox(tnps_frame, textvariable=tnps_var, values=[str(i) for i in range(10)], state="readonly", width=5)
         tnps_combo.pack(side="left", padx=(5,5))
+        disable_mousewheel_on(tnps_combo)
         ttk.Button(tnps_frame, text="Guardar TNPS", command=lambda: [
             tnps_registros.append(int(tnps_var.get())) if tnps_var.get() else None,
             save_tnps(int(tnps_var.get())) if tnps_var.get() else None,
@@ -647,11 +700,13 @@ def run_app():
             ttk.Label(modal, text="Tipo de Solicitud:", font=("Segoe UI", 10, "bold")).grid(row=2, column=0, sticky='w', padx=8, pady=(6,2))
             tipo_solicitud_combo = ttk.Combobox(modal, textvariable=tipo_solicitud_var, state='readonly', values=['Cancelación', 'Migración', 'Portabilidad'])
             tipo_solicitud_combo.grid(row=3, column=0, padx=8, pady=(0,6), sticky='ew')
+            disable_mousewheel_on(tipo_solicitud_combo)
 
             motivo_solicitud_var = tk.StringVar(value='Motivos Económicos')
             ttk.Label(modal, text="Motivo de Solicitud:", font=("Segoe UI", 10, "bold")).grid(row=4, column=0, sticky='w', padx=8, pady=(6,2))
             motivo_solicitud_combo = ttk.Combobox(modal, textvariable=motivo_solicitud_var, state='readonly', values=['Cuestionamiento', 'Motivos Económicos', 'No usa el servicio', 'Inconveniente con el servicio', 'Inconforme con los beneficios', 'Otros'])
             motivo_solicitud_combo.grid(row=5, column=0, padx=8, pady=(0,6), sticky='ew')
+            disable_mousewheel_on(motivo_solicitud_combo)
 
             nombre_titular_var = tk.StringVar(value=nombre_var.get())
             ttk.Label(modal, text="Nombre del titular:", font=("Segoe UI", 10, "bold")).grid(row=6, column=0, sticky='w', padx=8, pady=(6,2))
@@ -777,6 +832,7 @@ def run_app():
             submotivo_var = tk.StringVar(value='SVA')
             submotivo_combo = ttk.Combobox(modal, textvariable=submotivo_var, values=['SVA', 'Otros', 'Ajuste'], state='readonly')
             submotivo_combo.grid(row=1, column=0, padx=8, pady=(0,8), sticky='ew')
+            disable_mousewheel_on(submotivo_combo)
 
             # SVA area stacked vertically
             sva_frame = ttk.Frame(modal)
@@ -791,11 +847,42 @@ def run_app():
             services_frame.grid(row=2, column=0, sticky='nsew', pady=(4,6))
 
             SVA_SERVICES = [
-                'Club Ciencia', 'Streaming Video', 'Paquete Deportes', 'Club Niños', 'Cloud Storage', 'Seguridad', 'Llamadas Ilimitadas', 'Roaming', 'SMS Pack', 'Data Boost', 'Music Service', 'Partner App'
+                'Abaco',
+                'Babbel',
+                'Busuu',
+                'Challenges Arena',
+                'Claro Juegos',
+                'CLD_GM Cloud Gaming',
+                'Club apps by claro',
+                'Club Ciencia',
+                'Contenta',
+                'Fuze Force',
+                'Gameeasy',
+                'Gokids',
+                'Goles L1 Max',
+                'Google play',
+                'Había una vez',
+                'Iedukar',
+                'Inglés Mágico',
+                'Jenius',
+                'Norton Cykadas',
+                'Pfl',
+                'Play Kids',
+                'Rescatel',
+                'Tono de Espera',
+                'Zenapp',
+                'Zenit'
             ]
 
             service_vars = []
-            cols = 2
+            cols = 3
+            # configure columns so checkboxes distribute evenly
+            for ci in range(cols):
+                try:
+                    services_frame.grid_columnconfigure(ci, weight=1)
+                except Exception:
+                    pass
+
             for idx, svc in enumerate(SVA_SERVICES):
                 var = tk.BooleanVar(value=(svc == 'Club Ciencia'))
                 service_vars.append((svc, var))
@@ -804,12 +891,16 @@ def run_app():
                 cb = ttk.Checkbutton(services_frame, text=svc, variable=var, command=lambda: update_services_selection())
                 cb.grid(row=r, column=c, sticky='w', padx=(0,8), pady=2)
 
+            # place 'Otro' on the next row, its entry spans the remaining columns
             otro_var = tk.BooleanVar(value=False)
             otro_text_var = tk.StringVar()
+            rows = (len(SVA_SERVICES) + cols - 1) // cols
+            otro_row = rows
             otro_cb = ttk.Checkbutton(services_frame, text='Otro (especificar)', variable=otro_var, command=lambda: update_services_selection())
-            otro_cb.grid(row=(len(SVA_SERVICES) // cols) + 1, column=0, sticky='w', pady=(6,0))
+            otro_cb.grid(row=otro_row, column=0, sticky='w', pady=(6,0))
             otro_entry = ttk.Entry(services_frame, textvariable=otro_text_var)
-            otro_entry.grid(row=(len(SVA_SERVICES) // cols) + 1, column=1, sticky='ew', padx=(6,0), pady=(6,0))
+            # span the rest of the columns so it has room
+            otro_entry.grid(row=otro_row, column=1, columnspan=(cols-1), sticky='ew', padx=(6,0), pady=(6,0))
 
             # cuantos / detalle variables (compatibility)
             cuantos_var = tk.StringVar(value='Uno')
