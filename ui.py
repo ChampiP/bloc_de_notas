@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 from plyer import notification
+import subprocess
 from db import connect_db, save_client, save_tnps
 from templates import templates
 from utils import get_saludo_personalizado, evaluar_tnps
@@ -36,30 +37,90 @@ def run_app():
         style.configure('Ajuste.TEntry', fieldbackground='lightblue', borderwidth=2, relief='solid')
 
         def apply_modern_theme():
-            root.configure(bg='#f5f5f5')
-            style.configure('TFrame', background='#f5f5f5', relief='flat')
-            style.configure('TLabel', background='#f5f5f5', foreground='#2c3e50', font=('Segoe UI', 11))
-            style.configure('TButton', font=('Segoe UI', 10, 'bold'), relief='flat', borderwidth=0, padding=(15,8))
-            style.map('TButton', background=[('active', '#4CAF50'), ('pressed', '#45a049')], 
-                      foreground=[('active', 'white'), ('pressed', 'white')])
-            style.configure('TEntry', fieldbackground='white', borderwidth=2, relief='flat', font=('Segoe UI', 10), padding=(8,6))
-            style.configure('TCombobox', fieldbackground='white', font=('Segoe UI', 10), padding=(8,6))
-            style.configure('TCheckbutton', background='#f5f5f5', font=('Segoe UI', 10))
-            style.configure('TScrollbar', background='#bdc3c7', troughcolor='#ecf0f1')
-            # El widget template_text se estiliza después de su creación
+            # Light (modern) palette
+            bg = '#f5f5f5'
+            fg = '#22303a'
+            input_bg = '#ffffff'
+            accent = '#4CAF50'
+            subtle = '#ecf0f1'
+
+            root.configure(bg=bg)
+            style.configure('TFrame', background=bg, relief='flat')
+            style.configure('TLabel', background=bg, foreground=fg, font=('Segoe UI', 11))
+            style.configure('TButton', font=('Segoe UI', 10, 'bold'), relief='flat', borderwidth=0, padding=(12,6))
+            style.map('TButton', background=[('active', accent), ('pressed', '#45a049')], foreground=[('!disabled', 'white')])
+            style.configure('TEntry', fieldbackground=input_bg, foreground=fg, borderwidth=2, relief='flat', font=('Segoe UI', 10), padding=(8,6))
+            style.configure('TCombobox', fieldbackground=input_bg, foreground=fg, font=('Segoe UI', 10), padding=(8,6))
+            style.configure('TCheckbutton', background=bg, foreground=fg, font=('Segoe UI', 10))
+            style.configure('TScrollbar', background='#bdc3c7', troughcolor=subtle)
+            # Ensure text widgets follow modern theme if they exist
+            try:
+                t = locals().get('template_text')
+                if t is not None:
+                    t.config(background="#fffbe6", foreground="#000000", insertbackground='#000000')
+            except Exception:
+                pass
 
         def apply_dark_theme():
-            root.configure(bg='#2c3e50')
-            style.configure('TFrame', background='#2c3e50', relief='flat')
-            style.configure('TLabel', background='#2c3e50', foreground='#ecf0f1', font=('Segoe UI', 11))
-            style.configure('TButton', font=('Segoe UI', 10, 'bold'), relief='flat', borderwidth=0, padding=(15,8))
-            style.map('TButton', background=[('active', '#e74c3c'), ('pressed', '#c0392b')], 
-                      foreground=[('active', 'white'), ('pressed', 'white')])
-            style.configure('TEntry', fieldbackground='#34495e', borderwidth=2, relief='flat', font=('Segoe UI', 10), padding=(8,6))
-            style.configure('TCombobox', fieldbackground='#34495e', font=('Segoe UI', 10), padding=(8,6))
-            style.configure('TCheckbutton', background='#2c3e50', font=('Segoe UI', 10))
-            style.configure('TScrollbar', background='#7f8c8d', troughcolor='#34495e')
-            # El widget template_text se estiliza después de su creación
+            # Dark palette (consistent, high contrast)
+            bg = '#1f2a33'           # main window background
+            pane = '#24313a'         # panels / canvas
+            entry_bg = '#2b3942'     # entry / combobox background
+            fg = '#f5f8fa'           # text color
+            subtle = '#2f3d45'
+            accent = '#2f8bbf'
+
+            root.configure(bg=bg)
+            style.configure('TFrame', background=bg, relief='flat')
+            style.configure('TLabel', background=bg, foreground=fg, font=('Segoe UI', 11))
+            style.configure('TButton', font=('Segoe UI', 10, 'bold'), relief='flat', borderwidth=0, padding=(10,6))
+            style.map('TButton', background=[('active', accent), ('pressed', '#1f5f86')], foreground=[('!disabled', fg)])
+            style.configure('TEntry', fieldbackground=entry_bg, foreground=fg, borderwidth=1, relief='flat', font=('Segoe UI', 10), padding=(6,5))
+            style.configure('TCombobox', fieldbackground=entry_bg, foreground=fg, font=('Segoe UI', 10), padding=(6,5))
+            style.configure('TCheckbutton', background=bg, foreground=fg, font=('Segoe UI', 10))
+            style.configure('TScrollbar', background=subtle, troughcolor=pane)
+            style.configure('TSeparator', background=subtle)
+
+            # canvas/panels
+            try:
+                c = locals().get('canvas')
+                if c is not None:
+                    c.config(bg=pane)
+            except Exception:
+                pass
+
+            # text widgets if present: use high contrast for readability
+            try:
+                t = locals().get('template_text')
+                if t is not None:
+                    t.config(background='#152126', foreground=fg, insertbackground=fg)
+            except Exception:
+                pass
+            # make copy button and regular buttons less bright in dark mode
+            try:
+                style.configure('Copy.TButton', background='#2b3b44', foreground=fg)
+                style.configure('TButton', background='#2b3b44', foreground=fg)
+            except Exception:
+                pass
+            for name in ('info_text', 'otros_text', 'obs_text', 'extra_text', 'solucion_text'):
+                try:
+                    w = locals().get(name)
+                    if w is not None:
+                        w.config(background='#152126', foreground=fg, insertbackground=fg)
+                except Exception:
+                    pass
+
+            # saludo and status labels if present
+            try:
+                if 'saludo_label' in locals():
+                    saludo_label.config(bg=bg, fg='#dfeff6')
+            except Exception:
+                pass
+            try:
+                if 'db_status_label' in locals():
+                    db_status_label.config(foreground='#8fd19e')
+            except Exception:
+                pass
 
         def toggle_theme():
             nonlocal current_theme
@@ -75,6 +136,16 @@ def run_app():
         # Estilos adicionales: boton de copiar pequeño y label de saludo resaltado
         style.configure('Copy.TButton', font=('Segoe UI', 9), padding=(4,2))
 
+        def close_all_excel():
+            """Cerrar todos los procesos de Excel (Windows)."""
+            try:
+                subprocess.run(["taskkill", "/IM", "EXCEL.EXE", "/F"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                print("Todos los procesos de Excel han sido terminados.")
+            except subprocess.CalledProcessError as e:
+                print(f"No se pudieron cerrar todos los procesos de Excel o no había procesos: {e}")
+            except Exception as e:
+                print(f"Error al intentar cerrar Excel: {e}")
+
         # Header (replacing the big framed box) to keep a cleaner look
         header_frame = ttk.Frame(root)
         header_frame.pack(fill="x", padx=8, pady=(8,0))
@@ -83,10 +154,11 @@ def run_app():
         # Move credentials buttons to the header (top-right)
         creds_frame = ttk.Frame(header_frame)
         creds_frame.pack(side='right')
-
         ttk.Button(creds_frame, text="🔒VPN", width=5, style='Copy.TButton', command=lambda: copy_credential('vpn_password', 'VPN')).pack(side='right', padx=(2,0))
         ttk.Button(creds_frame, text="🔑SIAC", width=5, style='Copy.TButton', command=lambda: copy_credential('siac_password', 'SIAC')).pack(side='right', padx=(2,0))
         ttk.Button(creds_frame, text="✏️", width=3, style='Copy.TButton', command=lambda: open_credentials_modal()).pack(side='right', padx=(2,6))
+        # Button to close all open Excel processes (Windows)
+        ttk.Button(creds_frame, text="Cerrar Excel", width=10, style='Copy.TButton', command=close_all_excel).pack(side='right', padx=(6,2))
 
         # Top frame para saludo y timer
         top_frame = ttk.Frame(root)
@@ -98,15 +170,10 @@ def run_app():
 
         # Variables
         nombre_var = tk.StringVar()
+        numero_var = tk.StringVar()
         sn_var = tk.StringVar()
         dni_var = tk.StringVar()
         timer_var = tk.StringVar(value="00:00")
-        timer_running = False
-        timer_seconds = 0
-        alert_10min_shown = False
-        standup_timer_id = None
-        last_client_id = None
-        tnps_registros = []
 
         # Cargar TNPS del día actual desde DB (en try separado para no fallar la UI)
         try:
@@ -253,6 +320,8 @@ def run_app():
             except Exception as e:
                 messagebox.showerror("Error", f"Error al obtener credencial: {e}")
 
+        
+
     # (moved) creds_frame defined in header_frame above
 
         def check_db_status():
@@ -325,7 +394,17 @@ def run_app():
 
         def start_timer():
             nonlocal timer_running, timer_seconds
-            if nombre_var.get() and not timer_running:
+            # start timer if either nombre or numero has content
+            try:
+                has_name = bool(nombre_var.get().strip())
+            except Exception:
+                has_name = False
+            try:
+                has_num = bool(numero_var.get().strip())
+            except Exception:
+                has_num = False
+
+            if (has_name or has_num) and not timer_running:
                 timer_running = True
                 timer_seconds = 0
                 update_timer()
@@ -370,6 +449,11 @@ def run_app():
                 root.after(1000, update_timer)
 
         nombre_var.trace_add("write", update_saludo)
+        # start timer also when the numero field gets data
+        try:
+            numero_var.trace_add("write", lambda *a: start_timer())
+        except Exception:
+            pass
 
         # Separator
         sep1 = ttk.Separator(scrollable_frame, orient='horizontal')
@@ -397,7 +481,7 @@ def run_app():
 
         # Número
         ttk.Label(form_frame, text="Número:", font=("Segoe UI", 11, "bold")).grid(row=1, column=0, sticky="w", pady=(0,6))
-        numero_entry = ttk.Entry(form_frame, font=("Segoe UI", 10), width=25)
+        numero_entry = ttk.Entry(form_frame, textvariable=numero_var, font=("Segoe UI", 10), width=25)
         numero_entry.grid(row=1, column=1, sticky="ew", pady=(0,6))
         ttk.Button(form_frame, text="📋", style='Copy.TButton', width=3, command=lambda: [
             root.clipboard_clear(),
@@ -457,21 +541,48 @@ def run_app():
         motivo_frame = ttk.Frame(motivo_container)
         motivo_frame.pack(fill="x")
         motivo_var = tk.StringVar(value="Selecciona motivo...")
-        motivo_combo = ttk.Combobox(motivo_frame, textvariable=motivo_var, values=list(templates.keys()), state="readonly", font=("Segoe UI", 10))
+        # include an 'Otros' option in the motivo list
+        motivo_values = list(templates.keys())
+        # ensure 'Otros' is available
+        if 'Otros' not in motivo_values:
+            motivo_values.append('Otros')
+
+        # normalize: remove duplicates case-insensitively and remove 'Ajuste'
+        seen = set()
+        normalized = []
+        for v in motivo_values:
+            if not v:
+                continue
+            low = v.strip().lower()
+            if low == 'ajuste':
+                # remove this entry
+                continue
+            if low in seen:
+                continue
+            seen.add(low)
+            # canonicalize variants of Atención técnica
+            if low in ('atención técnica', 'atención tecnica', 'atencion tecnica'):
+                normalized.append('Atención técnica')
+            else:
+                normalized.append(v)
+        motivo_values = normalized
+        # ensure canonical Atención técnica exists
+        if not any(x.lower() == 'atención técnica' for x in motivo_values):
+            motivo_values.append('Atención técnica')
+        motivo_combo = ttk.Combobox(motivo_frame, textvariable=motivo_var, values=motivo_values, state="readonly", font=("Segoe UI", 10))
         motivo_combo.pack(side="left", fill="x", expand=True)
         disable_mousewheel_on(motivo_combo)
 
         def update_template(event=None):
             motivo = motivo_var.get()
-            if motivo not in ["Retención", "Cuestionamiento de recibo"]:
-                template_text.delete(1.0, tk.END)
-                template_text.insert(tk.END, templates.get(motivo, ""))
+            # Para motivos que requieren modal, abrir modal específico y no sobrescribir plantilla
+            if motivo == 'Atención técnica':
+                try:
+                    open_tecnica_modal()
+                except Exception:
+                    pass
+                return
 
-        motivo_combo.bind("<<ComboboxSelected>>", update_template)
-
-        def update_template(event=None):
-            motivo = motivo_var.get()
-            # Para motivos que requieren modal, no sobrescribimos si se quiere manejar de otra forma
             if motivo not in ["Retención", "Cuestionamiento de recibo"]:
                 try:
                     template_text.delete(1.0, tk.END)
@@ -479,6 +590,162 @@ def run_app():
                 except Exception:
                     # template_text aún no creado en algunos flujos; ignorar
                     pass
+
+        # Bind the combobox selection to the consolidated update_template
+        try:
+            motivo_combo.bind("<<ComboboxSelected>>", update_template)
+        except Exception:
+            pass
+
+        def open_otros_modal():
+            modal = tk.Toplevel(root)
+            modal.title("Otros - Detalle")
+            modal.transient(root)
+            modal.grab_set()
+            try:
+                root.update_idletasks()
+                main_w = root.winfo_width() or 324
+                main_h = root.winfo_height() or 600
+                position_modal(modal, int(max(324, main_w)), int(max(400, int(main_h * 0.6))), side='right')
+            except Exception:
+                pass
+            modal.grid_columnconfigure(0, weight=1)
+
+            ttk.Label(modal, text="El motivo de la consulta:", font=("Segoe UI", 10, "bold")).grid(row=0, column=0, sticky='w', padx=8, pady=(8,2))
+            motivo_consulta_var = tk.StringVar()
+            motivo_consulta_entry = ttk.Entry(modal, textvariable=motivo_consulta_var)
+            motivo_consulta_entry.grid(row=1, column=0, padx=8, pady=(0,6), sticky='ew')
+
+            ttk.Label(modal, text="La solución o información brindada:", font=("Segoe UI", 10, "bold")).grid(row=2, column=0, sticky='w', padx=8, pady=(6,2))
+            solucion_text = tk.Text(modal, height=6)
+            solucion_text.grid(row=3, column=0, padx=8, pady=(0,6), sticky='nsew')
+
+            ttk.Label(modal, text="SN:", font=("Segoe UI", 10, "bold")).grid(row=4, column=0, sticky='w', padx=8, pady=(6,2))
+            sn_local_var = tk.StringVar(value=sn_var.get())
+            sn_local_entry = ttk.Entry(modal, textvariable=sn_local_var)
+            sn_local_entry.grid(row=5, column=0, padx=8, pady=(0,6), sticky='ew')
+
+            def guardar_otros():
+                if not motivo_consulta_var.get().strip():
+                    messagebox.showwarning('Validación', 'Ingresa el motivo de la consulta')
+                    return
+                if not solucion_text.get(1.0, tk.END).strip():
+                    messagebox.showwarning('Validación', 'Ingresa la solución o información brindada')
+                    return
+
+                final = (
+                    f"El motivo de la consulta: {motivo_consulta_var.get().strip()}\n"
+                    + f"La solucion o informacion brindada: {solucion_text.get(1.0, tk.END).strip()}\n"
+                    + f"SN: {sn_local_var.get().strip()}"
+                )
+
+                try:
+                    save_client(nombre_var.get(), numero_entry.get(), sn_local_var.get(), 'Otros', dni=dni_var.get(), notas=final)
+                    try:
+                        template_text.delete(1.0, tk.END)
+                        template_text.insert(tk.END, final)
+                        root.clipboard_clear()
+                        root.clipboard_append(final)
+                    except Exception:
+                        pass
+                    print('Registro "Otros" guardado y plantilla copiada al portapapeles')
+                    modal.destroy()
+                except Exception as e:
+                    messagebox.showerror('Error', f'No se pudo guardar: {e}')
+
+            btns = ttk.Frame(modal)
+            btns.grid(row=6, column=0, sticky='ew', pady=8, padx=8)
+            ttk.Button(btns, text='Guardar', command=guardar_otros).pack(side='right', padx=(4,0))
+            ttk.Button(btns, text='Cancelar', command=modal.destroy).pack(side='right')
+
+        def open_tecnica_modal():
+            modal = tk.Toplevel(root)
+            modal.title("Atención Técnica")
+            modal.transient(root)
+            modal.grab_set()
+            try:
+                root.update_idletasks()
+                main_w = root.winfo_width() or 324
+                main_h = root.winfo_height() or 600
+                position_modal(modal, int(max(324, main_w)), int(max(360, int(main_h * 0.5))), side='right')
+            except Exception:
+                pass
+            modal.grid_columnconfigure(0, weight=1)
+
+            ttk.Label(modal, text="Nombre del cliente:", font=("Segoe UI", 10, "bold")).grid(row=0, column=0, sticky='w', padx=8, pady=(8,2))
+            nombre_tec_var = tk.StringVar(value=nombre_var.get())
+            ttk.Entry(modal, textvariable=nombre_tec_var).grid(row=1, column=0, sticky='ew', padx=8, pady=(0,6))
+
+            ttk.Label(modal, text="Línea afectada:", font=("Segoe UI", 10, "bold")).grid(row=2, column=0, sticky='w', padx=8, pady=(6,2))
+            linea_var = tk.StringVar(value=numero_var.get())
+            ttk.Entry(modal, textvariable=linea_var).grid(row=3, column=0, sticky='ew', padx=8, pady=(0,6))
+
+            ttk.Label(modal, text="Inconveniente reportado:", font=("Segoe UI", 10, "bold")).grid(row=4, column=0, sticky='w', padx=8, pady=(6,2))
+            # options from the image attachment
+            tec_options = [
+                'Inconvenientes con Llamadas e Internet',
+                'Inconvenientes con Llamadas',
+                'Inconvenientes con Internet',
+                'Inconvenientes con Redes Sociales / Otras Apps',
+                'Inconvenientes con SMS'
+            ]
+            tec_var = tk.StringVar(value=tec_options[0])
+            tec_combo = ttk.Combobox(modal, textvariable=tec_var, values=tec_options, state='readonly')
+            tec_combo.grid(row=5, column=0, sticky='ew', padx=8, pady=(0,6))
+            disable_mousewheel_on(tec_combo)
+
+            ttk.Label(modal, text="Detalle / Observaciones:", font=("Segoe UI", 10, "bold")).grid(row=6, column=0, sticky='w', padx=8, pady=(6,2))
+            detalle_text = tk.Text(modal, height=6)
+            detalle_text.grid(row=7, column=0, sticky='nsew', padx=8, pady=(0,6))
+            modal.grid_rowconfigure(7, weight=1)
+
+            ttk.Label(modal, text="Línea adicional:", font=("Segoe UI", 10, "bold")).grid(row=8, column=0, sticky='w', padx=8, pady=(6,2))
+            linea_add_var = tk.StringVar()
+            ttk.Entry(modal, textvariable=linea_add_var).grid(row=9, column=0, sticky='ew', padx=8, pady=(0,6))
+
+            def guardar_tecnica():
+                if not nombre_tec_var.get().strip():
+                    messagebox.showwarning('Validación', 'Ingresa el nombre del cliente')
+                    return
+                if not linea_var.get().strip():
+                    messagebox.showwarning('Validación', 'Ingresa la línea afectada')
+                    return
+                detalle = detalle_text.get(1.0, tk.END).strip()
+                # Build exact requested template with braces and the starred 'Línea adicional' line
+                incon = tec_var.get()
+                if detalle:
+                    incon = f"{incon} - {detalle}"
+
+                linea_add = linea_add_var.get().strip()
+
+                final = (
+                    + f"Nombre del cliente: {nombre_tec_var.get().strip()}\n"
+                    + f"Línea afectada: {linea_var.get().strip()}\n"
+                    + f"Inconveniente reportado: {incon}\n"
+                    + f"*Línea adicional: {linea_add}\n"
+                )
+                try:
+                    # try to save and then insert into editor
+                    try:
+                        save_client(nombre_tec_var.get(), linea_var.get(), sn_var.get(), 'Atención Técnica', dni=dni_var.get(), notas=final)
+                    except Exception:
+                        pass
+                    try:
+                        template_text.delete(1.0, tk.END)
+                        template_text.insert(tk.END, final)
+                        root.clipboard_clear()
+                        root.clipboard_append(final)
+                    except Exception:
+                        pass
+                    print('Atención Técnica guardada y plantilla copiada al portapapeles')
+                    modal.destroy()
+                except Exception as e:
+                    messagebox.showerror('Error', f'No se pudo guardar: {e}')
+
+            btns = ttk.Frame(modal)
+            btns.grid(row=10, column=0, sticky='ew', padx=8, pady=8)
+            ttk.Button(btns, text='Guardar', command=guardar_tecnica).pack(side='right', padx=(4,0))
+            ttk.Button(btns, text='Cancelar', command=modal.destroy).pack(side='right')
 
         # Modal genérico por motivo (ancho igual a la ventana principal)
         def open_motivo_modal(motivo_name, on_save_callback):
@@ -539,6 +806,13 @@ def run_app():
                     open_retencion_modal()
                 elif open_modal and motivo == "Cuestionamiento de recibo":
                     open_cuestionamiento_modal()
+                elif open_modal and motivo == "Atención técnica":
+                    # Open the Atención Técnica modal immediately before saving
+                    try:
+                        open_tecnica_modal()
+                    except Exception:
+                        pass
+                    return
                 elif open_modal:
                     # Mostrar modal genérico para el motivo antes de guardar
                     def guardar_desde_modal(extra_notas):
@@ -573,7 +847,7 @@ def run_app():
         ttk.Button(buttons_frame, text="Limpiar", command=lambda: [
             add_client(open_modal=False) if (nombre_var.get() and motivo_var.get() != "Selecciona motivo...") else None,
             nombre_var.set(""),
-            numero_entry.delete(0, tk.END),
+            numero_var.set(""),
             sn_var.set(""),
             dni_var.set(""),
             motivo_var.set("Selecciona motivo..."),
@@ -587,7 +861,19 @@ def run_app():
         notas_container = ttk.Frame(scrollable_frame)
         notas_container.pack(fill="both", expand=True, pady=(0,8), padx=8)
 
-        template_text = tk.Text(notas_container, height=8, wrap="word", font=("Segoe UI", 10), relief="flat", borderwidth=2, background="#fffbe6")
+        # Create template_text with colors according to current theme to avoid a very bright box in dark mode
+        try:
+            if current_theme == 'dark':
+                tpl_bg = '#152126'
+                tpl_fg = '#f5f8fa'
+            else:
+                tpl_bg = '#fffbe6'
+                tpl_fg = '#000000'
+        except Exception:
+            tpl_bg = '#fffbe6'
+            tpl_fg = '#000000'
+
+        template_text = tk.Text(notas_container, height=8, wrap="word", font=("Segoe UI", 10), relief="flat", borderwidth=2, background=tpl_bg, foreground=tpl_fg, insertbackground=tpl_fg)
         template_text.pack(fill="both", expand=True)
 
         update_template()  # Inicial
