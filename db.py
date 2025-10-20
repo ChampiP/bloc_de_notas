@@ -12,7 +12,7 @@ def connect_db():
 
 
 def ensure_credentials_table():
-    """Create a small key/value table for storing credentials if it doesn't exist."""
+    # Crea una pequeña tabla clave/valor para guardar credenciales si no existe.
     conn = connect_db()
     with conn.cursor() as cursor:
         cursor.execute("""
@@ -62,7 +62,7 @@ def save_client(nombre, numero, sn, motivo, **kwargs):
     return client_id
 
 def save_tnps(tnps_score, calculated=None):
-    # Use shared util if available
+    # Usa la función utilitaria compartida si está disponible
     try:
         from utils import calculate_tnps_point
     except Exception:

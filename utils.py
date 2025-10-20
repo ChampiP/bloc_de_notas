@@ -19,10 +19,9 @@ def evaluar_tnps(valor):
 
 
 def calculate_tnps_point(value):
-    """Map a single TNPS score to a percentage point according to rules:
-    8-9 -> 100, 6-7 -> 50, 0-5 -> 0
-    Returns integer 0/50/100.
-    """
+    # Convierte un puntaje TNPS a un valor porcentual según las reglas:
+    # 8-9 -> 100, 6-7 -> 50, 0-5 -> 0
+    # Devuelve un entero 0/50/100.
     try:
         v = int(value)
     except Exception:
@@ -35,9 +34,8 @@ def calculate_tnps_point(value):
 
 
 def calculate_tnps_percentage(scores):
-    """Calculate the TNPS percentage from an iterable of scores using calculate_tnps_point.
-    Returns a float percentage (0-100) rounded to 2 decimals.
-    """
+    # Calcula el porcentaje TNPS a partir de una lista de puntajes usando calculate_tnps_point.
+    # Devuelve un float (0-100) redondeado a 2 decimales.
     pts = []
     for s in scores:
         try:

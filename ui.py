@@ -5,6 +5,7 @@ import subprocess
 from db import connect_db, save_client, save_tnps
 from templates import templates
 from utils import get_saludo_personalizado, evaluar_tnps
+from modales import ModalManager
 
 def run_app():
     print("[DEBUG] run_app() iniciado")
@@ -598,154 +599,19 @@ def run_app():
             pass
 
         def open_otros_modal():
-            modal = tk.Toplevel(root)
-            modal.title("Otros - Detalle")
-            modal.transient(root)
-            modal.grab_set()
+            # Delegate to ModalManager implementation
             try:
-                root.update_idletasks()
-                main_w = root.winfo_width() or 324
-                main_h = root.winfo_height() or 600
-                position_modal(modal, int(max(324, main_w)), int(max(400, int(main_h * 0.6))), side='right')
+                modal_manager.open_otros_modal()
             except Exception:
+                # fallback: do nothing if manager not available
                 pass
-            modal.grid_columnconfigure(0, weight=1)
-
-            ttk.Label(modal, text="El motivo de la consulta:", font=("Segoe UI", 10, "bold")).grid(row=0, column=0, sticky='w', padx=8, pady=(8,2))
-            motivo_consulta_var = tk.StringVar()
-            motivo_consulta_entry = ttk.Entry(modal, textvariable=motivo_consulta_var)
-            motivo_consulta_entry.grid(row=1, column=0, padx=8, pady=(0,6), sticky='ew')
-
-            ttk.Label(modal, text="La solución o información brindada:", font=("Segoe UI", 10, "bold")).grid(row=2, column=0, sticky='w', padx=8, pady=(6,2))
-            solucion_text = tk.Text(modal, height=6)
-            solucion_text.grid(row=3, column=0, padx=8, pady=(0,6), sticky='nsew')
-
-            ttk.Label(modal, text="SN:", font=("Segoe UI", 10, "bold")).grid(row=4, column=0, sticky='w', padx=8, pady=(6,2))
-            sn_local_var = tk.StringVar(value=sn_var.get())
-            sn_local_entry = ttk.Entry(modal, textvariable=sn_local_var)
-            sn_local_entry.grid(row=5, column=0, padx=8, pady=(0,6), sticky='ew')
-
-            def guardar_otros():
-                if not motivo_consulta_var.get().strip():
-                    messagebox.showwarning('Validación', 'Ingresa el motivo de la consulta')
-                    return
-                if not solucion_text.get(1.0, tk.END).strip():
-                    messagebox.showwarning('Validación', 'Ingresa la solución o información brindada')
-                    return
-
-                final = (
-                    f"El motivo de la consulta: {motivo_consulta_var.get().strip()}\n"
-                    + f"La solucion o informacion brindada: {solucion_text.get(1.0, tk.END).strip()}\n"
-                    + f"SN: {sn_local_var.get().strip()}"
-                )
-
-                try:
-                    save_client(nombre_var.get(), numero_entry.get(), sn_local_var.get(), 'Otros', dni=dni_var.get(), notas=final)
-                    try:
-                        template_text.delete(1.0, tk.END)
-                        template_text.insert(tk.END, final)
-                        root.clipboard_clear()
-                        root.clipboard_append(final)
-                    except Exception:
-                        pass
-                    print('Registro "Otros" guardado y plantilla copiada al portapapeles')
-                    modal.destroy()
-                except Exception as e:
-                    messagebox.showerror('Error', f'No se pudo guardar: {e}')
-
-            btns = ttk.Frame(modal)
-            btns.grid(row=6, column=0, sticky='ew', pady=8, padx=8)
-            ttk.Button(btns, text='Guardar', command=guardar_otros).pack(side='right', padx=(4,0))
-            ttk.Button(btns, text='Cancelar', command=modal.destroy).pack(side='right')
 
         def open_tecnica_modal():
-            modal = tk.Toplevel(root)
-            modal.title("Atención Técnica")
-            modal.transient(root)
-            modal.grab_set()
+            # Delegate to ModalManager implementation
             try:
-                root.update_idletasks()
-                main_w = root.winfo_width() or 324
-                main_h = root.winfo_height() or 600
-                position_modal(modal, int(max(324, main_w)), int(max(360, int(main_h * 0.5))), side='right')
+                modal_manager.open_tecnica_modal()
             except Exception:
                 pass
-            modal.grid_columnconfigure(0, weight=1)
-
-            ttk.Label(modal, text="Nombre del cliente:", font=("Segoe UI", 10, "bold")).grid(row=0, column=0, sticky='w', padx=8, pady=(8,2))
-            nombre_tec_var = tk.StringVar(value=nombre_var.get())
-            ttk.Entry(modal, textvariable=nombre_tec_var).grid(row=1, column=0, sticky='ew', padx=8, pady=(0,6))
-
-            ttk.Label(modal, text="Línea afectada:", font=("Segoe UI", 10, "bold")).grid(row=2, column=0, sticky='w', padx=8, pady=(6,2))
-            linea_var = tk.StringVar(value=numero_var.get())
-            ttk.Entry(modal, textvariable=linea_var).grid(row=3, column=0, sticky='ew', padx=8, pady=(0,6))
-
-            ttk.Label(modal, text="Inconveniente reportado:", font=("Segoe UI", 10, "bold")).grid(row=4, column=0, sticky='w', padx=8, pady=(6,2))
-            # options from the image attachment
-            tec_options = [
-                'Inconvenientes con Llamadas e Internet',
-                'Inconvenientes con Llamadas',
-                'Inconvenientes con Internet',
-                'Inconvenientes con Redes Sociales / Otras Apps',
-                'Inconvenientes con SMS'
-            ]
-            tec_var = tk.StringVar(value=tec_options[0])
-            tec_combo = ttk.Combobox(modal, textvariable=tec_var, values=tec_options, state='readonly')
-            tec_combo.grid(row=5, column=0, sticky='ew', padx=8, pady=(0,6))
-            disable_mousewheel_on(tec_combo)
-
-            ttk.Label(modal, text="Detalle / Observaciones:", font=("Segoe UI", 10, "bold")).grid(row=6, column=0, sticky='w', padx=8, pady=(6,2))
-            detalle_text = tk.Text(modal, height=6)
-            detalle_text.grid(row=7, column=0, sticky='nsew', padx=8, pady=(0,6))
-            modal.grid_rowconfigure(7, weight=1)
-
-            ttk.Label(modal, text="Línea adicional:", font=("Segoe UI", 10, "bold")).grid(row=8, column=0, sticky='w', padx=8, pady=(6,2))
-            linea_add_var = tk.StringVar()
-            ttk.Entry(modal, textvariable=linea_add_var).grid(row=9, column=0, sticky='ew', padx=8, pady=(0,6))
-
-            def guardar_tecnica():
-                if not nombre_tec_var.get().strip():
-                    messagebox.showwarning('Validación', 'Ingresa el nombre del cliente')
-                    return
-                if not linea_var.get().strip():
-                    messagebox.showwarning('Validación', 'Ingresa la línea afectada')
-                    return
-                detalle = detalle_text.get(1.0, tk.END).strip()
-                # Build exact requested template with braces and the starred 'Línea adicional' line
-                incon = tec_var.get()
-                if detalle:
-                    incon = f"{incon} - {detalle}"
-
-                linea_add = linea_add_var.get().strip()
-
-                final = (
-                    + f"Nombre del cliente: {nombre_tec_var.get().strip()}\n"
-                    + f"Línea afectada: {linea_var.get().strip()}\n"
-                    + f"Inconveniente reportado: {incon}\n"
-                    + f"*Línea adicional: {linea_add}\n"
-                )
-                try:
-                    # try to save and then insert into editor
-                    try:
-                        save_client(nombre_tec_var.get(), linea_var.get(), sn_var.get(), 'Atención Técnica', dni=dni_var.get(), notas=final)
-                    except Exception:
-                        pass
-                    try:
-                        template_text.delete(1.0, tk.END)
-                        template_text.insert(tk.END, final)
-                        root.clipboard_clear()
-                        root.clipboard_append(final)
-                    except Exception:
-                        pass
-                    print('Atención Técnica guardada y plantilla copiada al portapapeles')
-                    modal.destroy()
-                except Exception as e:
-                    messagebox.showerror('Error', f'No se pudo guardar: {e}')
-
-            btns = ttk.Frame(modal)
-            btns.grid(row=10, column=0, sticky='ew', padx=8, pady=8)
-            ttk.Button(btns, text='Guardar', command=guardar_tecnica).pack(side='right', padx=(4,0))
-            ttk.Button(btns, text='Cancelar', command=modal.destroy).pack(side='right')
 
         # Modal genérico por motivo (ancho igual a la ventana principal)
         def open_motivo_modal(motivo_name, on_save_callback):
@@ -875,8 +741,24 @@ def run_app():
 
         template_text = tk.Text(notas_container, height=8, wrap="word", font=("Segoe UI", 10), relief="flat", borderwidth=2, background=tpl_bg, foreground=tpl_fg, insertbackground=tpl_fg)
         template_text.pack(fill="both", expand=True)
-
+        
         update_template()  # Inicial
+
+        # Modal manager: instantiate and pass necessary references
+        try:
+            modal_manager = ModalManager(root, {
+                'template_text': template_text,
+                'nombre_var': nombre_var,
+                'numero_var': numero_var,
+                'sn_var': sn_var,
+                'dni_var': dni_var,
+                'numero_entry': numero_entry,
+                'save_client': save_client,
+                'position_modal': position_modal,
+                'disable_mousewheel_on': disable_mousewheel_on
+            })
+        except Exception:
+            modal_manager = None
 
         # Botón copiar plantilla
         ttk.Button(scrollable_frame, text="Copiar Plantilla", command=lambda: [
