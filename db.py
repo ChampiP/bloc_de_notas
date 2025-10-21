@@ -48,18 +48,46 @@ def set_credential(key, value):
 
 def save_client(nombre, numero, sn, motivo, **kwargs):
     conn = connect_db()
-    with conn.cursor() as cursor:
-        sql = """INSERT INTO clientes (nombre, numero, sn, motivo_llamada, tipo_solicitud, motivo_solicitud, nombre_titular, dni, telefono_contacto, telefono_afectado, accion_ofrecida, otros_motivo, notas) \
-                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
-        cursor.execute(sql, (nombre, numero, sn, motivo, 
-                             kwargs.get('tipo_solicitud'), kwargs.get('motivo_solicitud'), 
-                             kwargs.get('nombre_titular'), kwargs.get('dni'), 
-                             kwargs.get('telefono_contacto'), kwargs.get('telefono_afectado'), 
-                             kwargs.get('accion_ofrecida'), kwargs.get('otros_motivo'), kwargs.get('notas')))
-        client_id = cursor.lastrowid
-    conn.commit()
-    conn.close()
-    return client_id
+    try:
+        with conn.cursor() as cursor:
+            # Intentamos insertar todas las columnas esperadas
+            sql = ("INSERT INTO clientes (nombre, numero, sn, motivo_llamada, tipo_solicitud, motivo_solicitud, "
+                   "nombre_titular, dni, telefono_contacto, telefono_afectado, accion_ofrecida, otros_motivo, notas) "
+                   "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)")
+            params = (
+                nombre, numero, sn, motivo,
+                kwargs.get('tipo_solicitud'), kwargs.get('motivo_solicitud'),
+                kwargs.get('nombre_titular'), kwargs.get('dni'),
+                kwargs.get('telefono_contacto'), kwargs.get('telefono_afectado'),
+                kwargs.get('accion_ofrecida'), kwargs.get('otros_motivo'), kwargs.get('notas')
+            )
+            try:
+                cursor.execute(sql, params)
+            except Exception as e:
+                # Si falla (p. ej. columna notas no existe), intentamos un INSERT más pequeño que no incluya notas
+                try:
+                    sql2 = ("INSERT INTO clientes (nombre, numero, sn, motivo_llamada, tipo_solicitud, motivo_solicitud, "
+                            "nombre_titular, dni, telefono_contacto, telefono_afectado, accion_ofrecida, otros_motivo) "
+                            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)")
+                    params2 = (
+                        nombre, numero, sn, motivo,
+                        kwargs.get('tipo_solicitud'), kwargs.get('motivo_solicitud'),
+                        kwargs.get('nombre_titular'), kwargs.get('dni'),
+                        kwargs.get('telefono_contacto'), kwargs.get('telefono_afectado'),
+                        kwargs.get('accion_ofrecida'), kwargs.get('otros_motivo')
+                    )
+                    cursor.execute(sql2, params2)
+                except Exception as e2:
+                    # Re-raise the original or new exception for the caller to handle/log
+                    raise
+            client_id = cursor.lastrowid
+        conn.commit()
+        return client_id
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 def save_tnps(tnps_score, calculated=None):
     # Usa la función utilitaria compartida si está disponible
@@ -86,9 +114,33 @@ def save_tnps(tnps_score, calculated=None):
                 calculated = 0
 
     conn = connect_db()
-    with conn.cursor() as cursor:
-        sql = "INSERT INTO tnps (tnps_score, tnps_calculated) VALUES (%s, %s)"
-        cursor.execute(sql, (score, calculated))
-    conn.commit()
-    conn.close()
-    return calculated
+    try:
+        with conn.cursor() as cursor:
+            sql = "INSERT INTO tnps (tnps_score, tnps_calculated) VALUES (%s, %s)"
+            cursor.execute(sql, (score, calculated))
+        conn.commit()
+        return calculated
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+def get_clients_grouped_by_day(limit=500):
+    """Devuelve una lista de filas de clientes ordenadas por fecha (más recientes primero).
+    El modal puede agrupar por fecha. Limit por seguridad para no cargar demasiadas filas.
+    Cada fila es un dict con columnas: id, nombre, numero, sn, dni, motivo_llamada, fecha_llamada, notas
+    """
+    conn = connect_db()
+    try:
+        with conn.cursor() as cursor:
+            sql = ("SELECT id, nombre, numero, sn, dni, motivo_llamada, fecha_llamada, COALESCE(notas, '') as notas "
+                   "FROM clientes ORDER BY fecha_llamada DESC LIMIT %s")
+            cursor.execute(sql, (limit,))
+            rows = cursor.fetchall()
+        return rows
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass

@@ -38,88 +38,137 @@ def run_app():
         style.configure('Ajuste.TEntry', fieldbackground='lightblue', borderwidth=2, relief='solid')
 
         def apply_modern_theme():
-            # Light (modern) palette
-            bg = '#f5f5f5'
-            fg = '#22303a'
-            input_bg = '#ffffff'
-            accent = '#4CAF50'
-            subtle = '#ecf0f1'
+            # Tema moderno (claro): limpio, profesional y de alta visibilidad
+            bg = '#f8f9fa'          # Soft background for main window
+            fg = "#000000"          # Dark text for high contrast
+            input_bg = '#ffffff'    # White inputs
+            accent = '#007acc'      # Blue accent (consistent with dark)
+            subtle = '#e9ecef'      # Subtle borders/separators
 
             root.configure(bg=bg)
             style.configure('TFrame', background=bg, relief='flat')
             style.configure('TLabel', background=bg, foreground=fg, font=('Segoe UI', 11))
             style.configure('TButton', font=('Segoe UI', 10, 'bold'), relief='flat', borderwidth=0, padding=(12,6))
-            style.map('TButton', background=[('active', accent), ('pressed', '#45a049')], foreground=[('!disabled', 'white')])
+            style.map('TButton', background=[('active', accent), ('pressed', '#005a9e')], foreground=[('!disabled', 'white')])
+            # Primary accent button for modern theme
+            style.configure('Accent.TButton', font=('Segoe UI', 10, 'bold'), background=accent, foreground='white', padding=(12,6))
+            style.map('Accent.TButton', background=[('active', '#005a9e'), ('pressed', '#004275')])
             style.configure('TEntry', fieldbackground=input_bg, foreground=fg, borderwidth=2, relief='flat', font=('Segoe UI', 10), padding=(8,6))
             style.configure('TCombobox', fieldbackground=input_bg, foreground=fg, font=('Segoe UI', 10), padding=(8,6))
             style.configure('TCheckbutton', background=bg, foreground=fg, font=('Segoe UI', 10))
             style.configure('TScrollbar', background='#bdc3c7', troughcolor=subtle)
-            # Ensure text widgets follow modern theme if they exist
+            # Asegurar que los widgets Text sigan el tema moderno si existen
             try:
                 t = locals().get('template_text')
                 if t is not None:
-                    t.config(background="#fffbe6", foreground="#000000", insertbackground='#000000')
+                    t.config(background="#fffbe6", foreground="#000000", insertbackground='#007acc')
             except Exception:
                 pass
 
         def apply_dark_theme():
-            # Dark palette (consistent, high contrast)
-            bg = '#1f2a33'           # main window background
-            pane = '#24313a'         # panels / canvas
-            entry_bg = '#2b3942'     # entry / combobox background
-            fg = '#f5f8fa'           # text color
-            subtle = '#2f3d45'
-            accent = '#2f8bbf'
+            # Tema moderno (oscuro): armónico, de alta visibilidad y aspecto profesional (inspirado en VS Code)
+            bg = '#1e1e1e'          # Deep background for main window
+            pane_bg = '#121212'     # Much darker for panels and canvas
+            input_bg = '#1b1b1b'    # Darker input fields background
+            fg = '#e6e6e6'          # Primary text color (soft white)
+            subtle_fg = '#999999'   # Subtle text for hints/help
+            border = '#454545'      # Borders and separators
+            accent = '#007acc'      # Soft blue accent (professional, visible)
+            accent_hover = '#005a9e' # Hover state
+            accent_pressed = '#004275' # Pressed state
 
             root.configure(bg=bg)
-            style.configure('TFrame', background=bg, relief='flat')
+            style.theme_use('clam')
+            style.configure('.', background=bg, foreground=fg, bordercolor=border)
+            style.configure('TFrame', background=bg)
             style.configure('TLabel', background=bg, foreground=fg, font=('Segoe UI', 11))
-            style.configure('TButton', font=('Segoe UI', 10, 'bold'), relief='flat', borderwidth=0, padding=(10,6))
-            style.map('TButton', background=[('active', accent), ('pressed', '#1f5f86')], foreground=[('!disabled', fg)])
-            style.configure('TEntry', fieldbackground=entry_bg, foreground=fg, borderwidth=1, relief='flat', font=('Segoe UI', 10), padding=(6,5))
-            style.configure('TCombobox', fieldbackground=entry_bg, foreground=fg, font=('Segoe UI', 10), padding=(6,5))
             style.configure('TCheckbutton', background=bg, foreground=fg, font=('Segoe UI', 10))
-            style.configure('TScrollbar', background=subtle, troughcolor=pane)
-            style.configure('TSeparator', background=subtle)
+            style.map('TCheckbutton',
+                indicatorcolor=[('selected', accent), ('active', accent_hover)],
+                background=[('active', bg)]
+            )
+            style.configure('TSeparator', background=border)
 
-            # canvas/panels
+            # Estilo de botón: apariencia acolchada y padding para mantener armonía
+            style.configure('TButton', font=('Segoe UI', 10, 'bold'),
+                            background=accent, foreground='white',
+                            borderwidth=0, padding=(12, 8), relief='flat')
+            style.map('TButton',
+                background=[('pressed', accent_pressed), ('active', accent_hover)],
+                foreground=[('!disabled', 'white')]
+            )
+            # Botón de copiar: más pequeño y sutil
+            style.configure('Copy.TButton', font=('Segoe UI', 9), padding=(4,2), background=accent, foreground='white')
+            style.configure('Accent.TButton', font=('Segoe UI', 10, 'bold'), background=accent, foreground='white', padding=(12,8))
+
+            # Entry/Combobox: limpio y de alto contraste
+            style.configure('TEntry', fieldbackground=input_bg, foreground=fg,
+                            borderwidth=1, relief='flat', font=('Segoe UI', 10), padding=(8, 6))
+            style.map('TEntry',
+                bordercolor=[('focus', accent), ('!focus', border)],
+                fieldbackground=[('focus', input_bg)]
+            )
+            style.configure('TCombobox',
+                fieldbackground=input_bg,
+                foreground=fg,
+                arrowcolor=fg,
+                background=input_bg,
+                borderwidth=0,
+                padding=(8, 6),
+                font=('Segoe UI', 10))
+            style.map('TCombobox',
+                bordercolor=[('focus', accent), ('!focus', border)],
+                fieldbackground=[('readonly', input_bg), ('focus', input_bg)],
+                selectbackground=[('readonly', input_bg)],
+                selectforeground=[('readonly', fg)]
+            )
+
+            # Barra de desplazamiento: sutil y moderna
+            style.configure('TScrollbar',
+                background=pane_bg,
+                troughcolor=bg,
+                borderwidth=0,
+                arrowsize=0,
+                relief='flat'
+            )
+            style.map('TScrollbar',
+                background=[('active', subtle_fg)]
+            )
+
+            # Canvas/paneles: fondo consistente para paneles
             try:
                 c = locals().get('canvas')
                 if c is not None:
-                    c.config(bg=pane)
+                    c.config(bg=pane_bg)
             except Exception:
                 pass
 
-            # text widgets if present: use high contrast for readability
+            # Widgets Text: alta legibilidad con el fondo de panel
             try:
                 t = locals().get('template_text')
                 if t is not None:
-                    t.config(background='#152126', foreground=fg, insertbackground=fg)
-            except Exception:
-                pass
-            # make copy button and regular buttons less bright in dark mode
-            try:
-                style.configure('Copy.TButton', background='#2b3b44', foreground=fg)
-                style.configure('TButton', background='#2b3b44', foreground=fg)
+                    # Usar un fondo más profundo para el área principal de notas y reducir el contraste
+                    t.config(background='#0f1112', foreground=fg, insertbackground=accent)
             except Exception:
                 pass
             for name in ('info_text', 'otros_text', 'obs_text', 'extra_text', 'solucion_text'):
                 try:
                     w = locals().get(name)
                     if w is not None:
-                        w.config(background='#152126', foreground=fg, insertbackground=fg)
+                        # Mantener widgets auxiliares ligeramente más claros que el fondo profundo de notas
+                        w.config(background=input_bg, foreground=fg, insertbackground=accent)
                 except Exception:
                     pass
 
-            # saludo and status labels if present
+            # Labels de saludo y estado: acento para el saludo, color verde para el estado
             try:
                 if 'saludo_label' in locals():
-                    saludo_label.config(bg=bg, fg='#dfeff6')
+                    saludo_label.config(bg=bg, fg=accent)
             except Exception:
                 pass
             try:
                 if 'db_status_label' in locals():
-                    db_status_label.config(foreground='#8fd19e')
+                    db_status_label.config(foreground='#4caf50')  # Green for OK
             except Exception:
                 pass
 
@@ -131,6 +180,9 @@ def run_app():
             else:
                 apply_modern_theme()
                 current_theme = 'modern'
+            # Actualizar el tema en el administrador de modales
+            if modal_manager:
+                modal_manager.ctx['current_theme'] = current_theme
 
         apply_modern_theme()
 
@@ -155,6 +207,7 @@ def run_app():
         # Move credentials buttons to the header (top-right)
         creds_frame = ttk.Frame(header_frame)
         creds_frame.pack(side='right')
+        ttk.Button(creds_frame, text="Lista", width=6, style='Copy.TButton', command=lambda: modal_manager.open_lista_atenciones_modal() if 'modal_manager' in locals() or 'modal_manager' in globals() else None).pack(side='right', padx=(4,2))
         ttk.Button(creds_frame, text="🔒VPN", width=5, style='Copy.TButton', command=lambda: copy_credential('vpn_password', 'VPN')).pack(side='right', padx=(2,0))
         ttk.Button(creds_frame, text="🔑SIAC", width=5, style='Copy.TButton', command=lambda: copy_credential('siac_password', 'SIAC')).pack(side='right', padx=(2,0))
         ttk.Button(creds_frame, text="✏️", width=3, style='Copy.TButton', command=lambda: open_credentials_modal()).pack(side='right', padx=(2,6))
@@ -285,10 +338,12 @@ def run_app():
                 pass
 
         # Saludo simplificado y resaltado: "Buenas noches, Sr. {Nombre}"
-        # Fondo del saludo igual al del contenedor para evitar el efecto de cuadro
-        saludo_bg = tk.Frame(top_frame, bg='#f5f5f5', bd=0)
+        # Fondo del saludo en modo claro usa un acento muy sutil para mejorar apariencia
+        saludo_color = '#e7f3ff' if current_theme == 'modern' else '#1e1e1e'
+        saludo_fg = '#154a6b' if current_theme == 'modern' else '#007acc'
+        saludo_bg = tk.Frame(top_frame, bg=saludo_color, bd=0)
         saludo_bg.pack(side='left', padx=(0,4))
-        saludo_label = tk.Label(saludo_bg, text=f"Buenas noches, Sr. {nombre_var.get() or 'Cliente'}", wraplength=260, justify="center", font=("Segoe UI", 11, "bold"), bg='#f5f5f5', fg='#154a6b', padx=6, pady=4)
+        saludo_label = tk.Label(saludo_bg, text=f"Buenas noches, Sr. {nombre_var.get() or 'Cliente'}", wraplength=260, justify="center", font=("Segoe UI", 11, "bold"), bg=saludo_color, fg=saludo_fg, padx=6, pady=4)
         saludo_label.pack()
 
         # Timer
@@ -314,7 +369,7 @@ def run_app():
                 if val:
                     root.clipboard_clear()
                     root.clipboard_append(val)
-                    # popup removed: copiar al portapapeles silenciosamente
+                    # popup eliminado: copiar al portapapeles silenciosamente
                     print(f"{friendly_name or key} copiado al portapapeles")
                 else:
                     messagebox.showwarning("Vacío", f"No hay valor guardado para {friendly_name or key}")
@@ -579,7 +634,8 @@ def run_app():
             # Para motivos que requieren modal, abrir modal específico y no sobrescribir plantilla
             if motivo == 'Atención técnica':
                 try:
-                    open_tecnica_modal()
+                    if modal_manager:
+                        modal_manager.open_tecnica_modal()
                 except Exception:
                     pass
                 return
@@ -598,117 +654,57 @@ def run_app():
         except Exception:
             pass
 
-        def open_otros_modal():
-            # Delegate to ModalManager implementation
-            try:
-                modal_manager.open_otros_modal()
-            except Exception:
-                # fallback: do nothing if manager not available
-                pass
-
-        def open_tecnica_modal():
-            # Delegate to ModalManager implementation
-            try:
-                modal_manager.open_tecnica_modal()
-            except Exception:
-                pass
-
-        # Modal genérico por motivo (ancho igual a la ventana principal)
-        def open_motivo_modal(motivo_name, on_save_callback):
-            modal = tk.Toplevel(root)
-            modal.title(motivo_name)
-            modal.transient(root)
-            modal.grab_set()
-
-            # use main window size so modal shows content without manual expand
-            try:
-                root.update_idletasks()
-                main_w = root.winfo_width() or 324
-                main_h = root.winfo_height() or 600
-                # aumentar ligeramente la altura del modal para que el botón 'Guardar' quede visible
-                # si la ventana principal es 600, forzamos al menos 700px en el modal
-                modal_h = max(700, int(main_h * 1.1))
-                position_modal(modal, int(max(324, main_w)), int(modal_h), side='right')
-            except Exception:
-                pass
-
-            # header (titulo arriba)
-            header = ttk.Frame(modal)
-            header.grid(row=0, column=0, sticky='ew', padx=12, pady=(8,4))
-            ttk.Label(header, text=f"Opciones para: {motivo_name}", font=("Segoe UI", 11, "bold")).pack(side='left')
-
-            extra_frame = ttk.Frame(modal)
-            extra_frame.grid(row=1, column=0, sticky='nsew', padx=12, pady=4)
-            modal.grid_columnconfigure(0, weight=1)
-            modal.grid_rowconfigure(1, weight=1)
-
-            # contenido vertical: etiqueta arriba, control abajo
-            extra_label = ttk.Label(extra_frame, text="Detalles:")
-            extra_label.grid(row=0, column=0, sticky='w')
-            extra_text = tk.Text(extra_frame, height=8, wrap='word')
-            extra_text.grid(row=1, column=0, sticky='nsew')
-            extra_frame.grid_rowconfigure(1, weight=1)
-
-            btns = ttk.Frame(modal)
-            btns.grid(row=2, column=0, sticky='ew', pady=8, padx=12)
-
-            def _save():
-                extra = extra_text.get(1.0, tk.END).strip()
-                on_save_callback(extra)
-                modal.destroy()
-
-            ttk.Button(btns, text='Guardar', command=_save).pack(side='right', padx=(4,0))
-            ttk.Button(btns, text='Cancelar', command=modal.destroy).pack(side='right')
-
-        # función para agregar cliente (colocada aquí para que los botones referencien el nombre)
+        # Llamar a los modales a través de ModalManager
         def add_client(open_modal=True):
             nonlocal last_client_id
             nombre = nombre_var.get()
             numero = numero_entry.get()
             sn = sn_var.get()
             motivo = motivo_var.get()
+            # Si el motivo es Atención técnica, abrir siempre el modal correspondiente
+            if motivo == 'Atención técnica':
+                try:
+                    if modal_manager:
+                        modal_manager.open_tecnica_modal()
+                except Exception:
+                    pass
+                return
             if nombre and motivo != "Selecciona motivo...":
                 if open_modal and motivo == "Retención":
-                    open_retencion_modal()
+                    if modal_manager:
+                        modal_manager.open_retencion_modal()
                 elif open_modal and motivo == "Cuestionamiento de recibo":
-                    open_cuestionamiento_modal()
+                    if modal_manager:
+                        modal_manager.open_cuestionamiento_modal()
                 elif open_modal and motivo == "Atención técnica":
-                    # Open the Atención Técnica modal immediately before saving
-                    try:
-                        open_tecnica_modal()
-                    except Exception:
-                        pass
+                    if modal_manager:
+                        modal_manager.open_tecnica_modal()
                     return
                 elif open_modal:
-                    # Mostrar modal genérico para el motivo antes de guardar
                     def guardar_desde_modal(extra_notas):
                         notas = (template_text.get(1.0, tk.END).strip() + '\n' + extra_notas).strip()
                         try:
                             last_id = save_client(nombre, numero, sn, motivo, dni=dni_var.get(), notas=notas)
-                            # popup removed: guardar cliente silencioso
                             print(f"Cliente guardado con ID: {last_id}")
                             stop_timer()
                             update_template()
                         except Exception as e:
                             messagebox.showerror("Error", f"Error al guardar cliente: {e}")
-
-                    open_motivo_modal(motivo, guardar_desde_modal)
+                    if modal_manager:
+                        modal_manager.open_motivo_modal(motivo, guardar_desde_modal)
                 else:
-                    # Para otros motivos, guardar con notas sin modal
                     notas = template_text.get(1.0, tk.END).strip()
                     try:
                         last_client_id = save_client(nombre, numero, sn, motivo, dni=dni_var.get(), notas=notas)
-                        # popup removed: guardar cliente silencioso
                         print(f"Cliente guardado con ID: {last_client_id}")
                         stop_timer()
                         update_template()
                     except Exception as e:
                         messagebox.showerror("Error", f"Error al guardar cliente: {e}")
 
-        # Buttons below Motivo de llamada (moved as requested)
+        # Botones bajo Motivo de llamada
         buttons_frame = ttk.Frame(scrollable_frame)
         buttons_frame.pack(fill="x", pady=(4,10), padx=8)
-
         ttk.Button(buttons_frame, text="Agregar Cliente", command=add_client).pack(side="left", padx=(0,10))
         ttk.Button(buttons_frame, text="Limpiar", command=lambda: [
             add_client(open_modal=False) if (nombre_var.get() and motivo_var.get() != "Selecciona motivo...") else None,
@@ -730,8 +726,8 @@ def run_app():
         # Create template_text with colors according to current theme to avoid a very bright box in dark mode
         try:
             if current_theme == 'dark':
-                tpl_bg = '#152126'
-                tpl_fg = '#f5f8fa'
+                tpl_bg = '#0f1112'  # Very deep background for notes in dark mode
+                tpl_fg = '#e6e6e6'
             else:
                 tpl_bg = '#fffbe6'
                 tpl_fg = '#000000'
@@ -739,7 +735,7 @@ def run_app():
             tpl_bg = '#fffbe6'
             tpl_fg = '#000000'
 
-        template_text = tk.Text(notas_container, height=8, wrap="word", font=("Segoe UI", 10), relief="flat", borderwidth=2, background=tpl_bg, foreground=tpl_fg, insertbackground=tpl_fg)
+        template_text = tk.Text(notas_container, height=8, wrap="word", font=("Segoe UI", 10), relief="flat", borderwidth=2, background=tpl_bg, foreground=tpl_fg, insertbackground='#007acc')
         template_text.pack(fill="both", expand=True)
         
         update_template()  # Inicial
@@ -755,7 +751,8 @@ def run_app():
                 'numero_entry': numero_entry,
                 'save_client': save_client,
                 'position_modal': position_modal,
-                'disable_mousewheel_on': disable_mousewheel_on
+                'disable_mousewheel_on': disable_mousewheel_on,
+                'current_theme': current_theme
             })
         except Exception:
             modal_manager = None
@@ -798,7 +795,7 @@ def run_app():
                 text = '\n'.join(map(str, tnps_registros))
                 root.clipboard_clear()
                 root.clipboard_append(text)
-                # popup removed: TNPS copiado silenciosamente
+                # popup eliminado: TNPS copiado silenciosamente
                 print("TNPS copiado al portapapeles")
             else:
                 messagebox.showwarning("TNPS", "No hay registros para copiar")
@@ -970,7 +967,7 @@ def run_app():
                         root.clipboard_append(final)
                     except Exception:
                         pass
-                    # popup removed: retención guardada silenciosamente
+                    # popup eliminado: retención guardada silenciosamente
                     print('Retención guardada y plantilla copiada al portapapeles')
                     modal.destroy()
                 except Exception as e:
@@ -1167,7 +1164,7 @@ def run_app():
                             root.clipboard_append(final)
                         except Exception:
                             pass
-                        # popup removed: cuestionamiento guardado silenciosamente
+                        # popup eliminado: cuestionamiento guardado silenciosamente
                         print('Registro guardado y plantilla copiada al portapapeles')
                         modal.destroy()
                     except Exception as e:
@@ -1182,7 +1179,7 @@ def run_app():
                         save_client(nombre_var.get(), numero_entry.get(), sn_var.get(), f'Cuestionamiento de recibo - {submotivo_var.get()}', dni=dni_var.get(), notas=final)
                         root.clipboard_clear()
                         root.clipboard_append(final)
-                        # popup removed: cuestionamiento guardado silenciosamente
+                        # popup eliminado: cuestionamiento guardado silenciosamente
                         print('Registro guardado y plantilla copiada al portapapeles')
                         modal.destroy()
                     except Exception as e:
@@ -1221,7 +1218,7 @@ def run_app():
                 try:
                     set_credential('vpn_password', vpn_var.get())
                     set_credential('siac_password', siac_var.get())
-                    # popup removed: credenciales guardadas silenciosamente
+                    # popup eliminado: credenciales guardadas silenciosamente
                     print('Credenciales guardadas correctamente')
                     modal.destroy()
                 except Exception as e:
