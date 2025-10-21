@@ -36,6 +36,36 @@ def run_app():
         current_theme = 'modern'
 
         style.configure('Ajuste.TEntry', fieldbackground='lightblue', borderwidth=2, relief='solid')
+        # Contenedor de iconos cargados para evitar que PhotoImage sea recolectado
+        root._icons = {}
+
+        def load_icon(name, size=(20,20)):
+            """Intenta cargar assets/icons/{name}.png y los guarda en root._icons. Devuelve PhotoImage o None."""
+            import os
+            path = os.path.join(os.path.dirname(__file__), 'assets', 'icons', f"{name}.png")
+            if not os.path.exists(path):
+                return None
+            try:
+                img = tk.PhotoImage(file=path)
+                # opcional: redimensionar no trivial con PhotoImage; asume PNG ya con tamaño adecuado
+                root._icons[name] = img
+                return img
+            except Exception:
+                return None
+
+        def create_icon_button(parent, icon_name=None, emoji_text=None, **kwargs):
+            """Crea un ttk.Button que usa una imagen si existe, o texto emoji como fallback.
+            Retorna el widget Button creado (no empaqueta automáticamente).
+            """
+            img = None
+            if icon_name:
+                img = load_icon(icon_name)
+            if img:
+                btn = ttk.Button(parent, image=img, command=kwargs.get('command'), style=kwargs.get('style', 'Copy.TButton'))
+            else:
+                text = emoji_text or icon_name or ''
+                btn = ttk.Button(parent, text=text, command=kwargs.get('command'), style=kwargs.get('style', 'Copy.TButton'))
+            return btn
 
         def apply_modern_theme():
             # Tema moderno (claro): limpio, profesional y de alta visibilidad
@@ -49,6 +79,8 @@ def run_app():
             style.configure('TFrame', background=bg, relief='flat')
             style.configure('TLabel', background=bg, foreground=fg, font=('Segoe UI', 11))
             style.configure('TButton', font=('Segoe UI', 10, 'bold'), relief='flat', borderwidth=0, padding=(12,6))
+            # Botón grande apilado (estilo para la columna de opciones tipo la captura)
+            style.configure('Big.TButton', font=('Segoe UI', 10, 'bold'), relief='flat', borderwidth=1, padding=(8,10), background='#f0f0f0')
             style.map('TButton', background=[('active', accent), ('pressed', '#005a9e')], foreground=[('!disabled', 'white')])
             # Primary accent button for modern theme
             style.configure('Accent.TButton', font=('Segoe UI', 10, 'bold'), background=accent, foreground='white', padding=(12,6))
@@ -207,12 +239,13 @@ def run_app():
         # Move credentials buttons to the header (top-right)
         creds_frame = ttk.Frame(header_frame)
         creds_frame.pack(side='right')
-        ttk.Button(creds_frame, text="Lista", width=6, style='Copy.TButton', command=lambda: modal_manager.open_lista_atenciones_modal() if 'modal_manager' in locals() or 'modal_manager' in globals() else None).pack(side='right', padx=(4,2))
-        ttk.Button(creds_frame, text="🔒VPN", width=5, style='Copy.TButton', command=lambda: copy_credential('vpn_password', 'VPN')).pack(side='right', padx=(2,0))
-        ttk.Button(creds_frame, text="🔑SIAC", width=5, style='Copy.TButton', command=lambda: copy_credential('siac_password', 'SIAC')).pack(side='right', padx=(2,0))
-        ttk.Button(creds_frame, text="✏️", width=3, style='Copy.TButton', command=lambda: open_credentials_modal()).pack(side='right', padx=(2,6))
+        # Usar iconos concretos si existen en assets/icons/*.png, sino usar emojis como fallback
+        create_icon_button(creds_frame, icon_name='lista', emoji_text='📄', command=lambda: modal_manager.open_lista_atenciones_modal() if 'modal_manager' in locals() or 'modal_manager' in globals() else None).pack(side='right', padx=(4,2))
+        create_icon_button(creds_frame, icon_name='vpn', emoji_text='🔒', command=lambda: copy_credential('vpn_password', 'VPN')).pack(side='right', padx=(2,0))
+        create_icon_button(creds_frame, icon_name='siac', emoji_text='🔑', command=lambda: copy_credential('siac_password', 'SIAC')).pack(side='right', padx=(2,0))
+        create_icon_button(creds_frame, icon_name='edit', emoji_text='✏️', command=lambda: open_credentials_modal()).pack(side='right', padx=(2,6))
         # Button to close all open Excel processes (Windows)
-        ttk.Button(creds_frame, text="Cerrar Excel", width=10, style='Copy.TButton', command=close_all_excel).pack(side='right', padx=(6,2))
+        create_icon_button(creds_frame, icon_name='excel_close', emoji_text='🗙', command=close_all_excel).pack(side='right', padx=(6,2))
 
         # Top frame para saludo y timer
         top_frame = ttk.Frame(root)
@@ -756,6 +789,190 @@ def run_app():
             })
         except Exception:
             modal_manager = None
+
+        # ----------------------
+        # Clipboard autollenado
+        # ----------------------
+        clipboard_history = []  # list of { 'text', 'parsed', 'ts' }
+        last_clip_text = ''
+        import time, json, re
+
+        SESSION_WINDOW = 180  # segundos
+        session = {'id': None, 'start': None, 'active': False}
+
+        # modo inicial: 'preguntar', 'autofill_empty', 'autofill_always'
+        clip_mode = 'preguntar'
+        clipboard_watcher_on = tk.BooleanVar(value=True)
+
+        def parse_clipboard(text):
+            parsed = {}
+            if not text or not text.strip():
+                return parsed
+            # intentar JSON
+            try:
+                obj = json.loads(text)
+                if isinstance(obj, dict):
+                    # mapear claves comunes
+                    for k in ('name','nombre','telefono','numero','sn','dni','email','notas'):
+                        if k in obj and obj[k]:
+                            parsed[k if k!='telefono' else 'numero'] = str(obj[k])
+                    return parsed
+            except Exception:
+                pass
+
+            # buscar email
+            m = re.search(r'[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}', text)
+            if m:
+                parsed['email'] = m.group(0)
+
+            # teléfono (bastante flexible)
+            m = re.search(r'(?:\+?\d{1,3}[-.\s]?)?(?:\d{6,12})', text)
+            if m:
+                phone = m.group(0).strip()
+                # evitar capturar partes de largos serials si parecen muy cortos
+                if len(re.sub(r'\D','',phone)) >= 6:
+                    parsed['numero'] = phone
+
+            # dni (7-9 dígitos)
+            m = re.search(r'\b\d{7,9}\b', text)
+            if m:
+                val = m.group(0)
+                # si ya detectamos un número telefónico, no sobreescribir
+                if 'numero' not in parsed:
+                    parsed['dni'] = val
+
+            # SN alfanumérico (heurística)
+            m = re.search(r'\b[A-Z0-9\-]{6,20}\b', text.upper())
+            if m:
+                parsed['sn'] = m.group(0)
+
+            # Nombre heurístico: dos palabras con inicial mayúscula
+            m = re.search(r'([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]+)+)', text)
+            if m:
+                parsed['nombre'] = m.group(1).strip()
+
+            # si nada estimable y el texto es largo -> notas
+            if not parsed and len(text.strip()) > 10:
+                parsed['notas'] = text.strip()
+
+            return parsed
+
+        def fill_fields(parsed, replace=False):
+            """Rellena los widgets con parsed. Si replace=False solo llena campos vacíos."""
+            try:
+                if 'nombre' in parsed:
+                    if replace or not nombre_var.get().strip():
+                        nombre_var.set(parsed['nombre'])
+                if 'numero' in parsed:
+                    if replace or not numero_var.get().strip():
+                        numero_var.set(parsed['numero'])
+                if 'sn' in parsed:
+                    if replace or not sn_var.get().strip():
+                        sn_var.set(parsed['sn'])
+                if 'dni' in parsed:
+                    if replace or not dni_var.get().strip():
+                        dni_var.set(parsed['dni'])
+                if 'notas' in parsed:
+                    if replace:
+                        try:
+                            template_text.delete(1.0, tk.END)
+                            template_text.insert(tk.END, parsed['notas'])
+                        except Exception:
+                            pass
+                    else:
+                        try:
+                            cur = template_text.get(1.0, tk.END).strip()
+                            if not cur:
+                                template_text.insert(tk.END, parsed['notas'])
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+
+        def show_suggestion_dialog(parsed):
+            # Small non-blocking dialog showing detected fields and asking user to Apply/Replace/Ignore
+            try:
+                dlg = tk.Toplevel(root)
+                dlg.title('Autollenado detectado')
+                dlg.transient(root)
+                dlg.resizable(False, False)
+                row = 0
+                ttk.Label(dlg, text='Se detectaron estos datos en el portapapeles:', font=('Segoe UI', 10, 'bold')).grid(row=row, column=0, columnspan=2, padx=8, pady=(8,4), sticky='w')
+                row += 1
+                for k, v in parsed.items():
+                    ttk.Label(dlg, text=f"{k.capitalize()}:", font=('Segoe UI', 9, 'bold')).grid(row=row, column=0, sticky='e', padx=6, pady=2)
+                    ttk.Label(dlg, text=v).grid(row=row, column=1, sticky='w', padx=6, pady=2)
+                    row += 1
+
+                def _apply():
+                    fill_fields(parsed, replace=False)
+                    dlg.destroy()
+
+                def _replace():
+                    fill_fields(parsed, replace=True)
+                    dlg.destroy()
+
+                def _ignore():
+                    dlg.destroy()
+
+                btns = ttk.Frame(dlg)
+                btns.grid(row=row, column=0, columnspan=2, pady=8)
+                ttk.Button(btns, text='Aplicar (solo vacíos)', command=_apply).pack(side='right', padx=6)
+                ttk.Button(btns, text='Reemplazar', command=_replace).pack(side='right', padx=6)
+                ttk.Button(btns, text='Ignorar', command=_ignore).pack(side='right', padx=6)
+            except Exception:
+                pass
+
+        def clipboard_watcher():
+            nonlocal last_clip_text
+            try:
+                clip = root.clipboard_get()
+            except Exception:
+                clip = ''
+            if not clipboard_watcher_on.get():
+                root.after(700, clipboard_watcher)
+                return
+            if clip and clip != last_clip_text:
+                ts = time.time()
+                parsed = parse_clipboard(clip)
+                clipboard_history.insert(0, {'text': clip, 'parsed': parsed, 'ts': ts})
+                # mantener historial corto
+                if len(clipboard_history) > 50:
+                    clipboard_history.pop()
+                # Si hay parsed y hay al menos un campo vacío en el formulario, sugerir
+                if parsed:
+                    any_empty = (not nombre_var.get().strip() or not numero_var.get().strip() or not sn_var.get().strip() or not dni_var.get().strip() or not template_text.get(1.0, tk.END).strip())
+                    # Si hay sesión activa, limitar al tiempo de sesión
+                    in_session = True
+                    if session['active'] and session['start']:
+                        in_session = (ts - session['start']) <= SESSION_WINDOW
+                    if in_session and any_empty:
+                        if clip_mode == 'autofill_always':
+                            fill_fields(parsed, replace=False)
+                        elif clip_mode == 'autofill_empty':
+                            fill_fields(parsed, replace=False)
+                        else:
+                            # preguntar
+                            show_suggestion_dialog(parsed)
+                last_clip_text = clip
+            root.after(700, clipboard_watcher)
+
+        # botón en header para aplicar último clip manualmente
+        def apply_last_clip():
+            if clipboard_history:
+                parsed = clipboard_history[0].get('parsed', {})
+                if parsed:
+                    fill_fields(parsed, replace=False)
+
+        # checkbox y botón en header (añadimos al creds_frame)
+        try:
+            ttk.Checkbutton(creds_frame, text='Auto', variable=clipboard_watcher_on).pack(side='right', padx=(6,2))
+            ttk.Button(creds_frame, text='📎', width=3, command=apply_last_clip).pack(side='right', padx=(4,2))
+        except Exception:
+            pass
+
+        # iniciar watcher
+        root.after(700, clipboard_watcher)
 
         # Botón copiar plantilla
         ttk.Button(scrollable_frame, text="Copiar Plantilla", command=lambda: [
