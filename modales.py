@@ -19,7 +19,11 @@ class BaseModal(tk.Toplevel):
         self._get_helpers_from_context()
 
     def _apply_theme(self):
-        bg_color = '#1e1e1e' if self.theme == 'dark' else '#f8f9fa'
+        themes = self.ctx.get('THEMES', {})
+        if themes and self.theme in themes:
+            bg_color = themes[self.theme].get('bg', '#f8f9fa')
+        else:
+            bg_color = '#1e1e1e' if self.theme == 'dark' else '#f8f9fa'
         self.configure(bg=bg_color)
 
     def _get_helpers_from_context(self):
@@ -370,59 +374,3 @@ class ModalManager:
         ListaAtencionesModal(self.root, self.ctx)
 
     def open_motivo_modal(self, motivo, callback): MotivoModal(self.root, self.ctx, motivo, callback)
-
-    def open_bloqueo_modal(self, ctx): BloqueoModal(self.root, ctx)
-
-class BloqueoModal(BaseModal):
-    def __init__(self, parent, ctx):
-        super().__init__(parent, "Motivo de Llamada: Bloqueo", ctx)
-        self.vars = self._get_vars_from_context(['sn_var'])
-        self._set_initial_geometry(width=400, height=300)
-        self._create_widgets()
-
-    def _create_widgets(self):
-        self.grid_columnconfigure(0, weight=1)
-        row = 0
-
-        # Botón 1: Bloqueo de línea y equipo
-        ttk.Button(self, text="Bloqueo de Línea y Equipo", command=self._bloqueo_linea_equipo).grid(row=row, column=0, padx=8, pady=(8,4), sticky="ew")
-        row += 1
-
-        # Botón 2: Desvincular para bloqueo
-        ttk.Label(self, text="IMI:").grid(row=row, column=0, sticky="w", padx=8, pady=(4,2))
-        self.imi_var = tk.StringVar()
-        ttk.Entry(self, textvariable=self.imi_var).grid(row=row+1, column=0, padx=8, pady=(0,4), sticky="ew")
-        row += 2
-
-        ttk.Label(self, text="Número:").grid(row=row, column=0, sticky="w", padx=8, pady=(4,2))
-        self.numero_var = tk.StringVar()
-        ttk.Entry(self, textvariable=self.numero_var).grid(row=row+1, column=0, padx=8, pady=(0,4), sticky="ew")
-        row += 2
-
-        ttk.Button(self, text="Desvincular para Bloqueo", command=self._desvincular_para_bloqueo).grid(row=row, column=0, padx=8, pady=(8,4), sticky="ew")
-
-    def _bloqueo_linea_equipo(self):
-        sn = self.vars['sn_var'].get()
-        plantilla = f"SN: {sn}\nSe procede bloqueo de línea y equipo a solicitud de cliente"
-        self._copy_to_clipboard_and_notes(plantilla)
-
-    def _desvincular_para_bloqueo(self):
-        imi = self.imi_var.get().strip()
-        numero = self.numero_var.get().strip()
-        if not imi or not numero:
-            messagebox.showwarning("Validación", "Completa los campos IMI y Número", parent=self)
-            return
-        plantilla = f"IMI: {imi}\nNúmero: {numero}\nDesvincular para bloqueo por favor"
-        self._copy_to_clipboard_and_notes(plantilla)
-
-    def _copy_to_clipboard_and_notes(self, text):
-        try:
-            template_text = self.ctx.get('template_text')
-            if template_text:
-                template_text.delete(1.0, tk.END)
-                template_text.insert(tk.END, text)
-            self.root.clipboard_clear()
-            self.root.clipboard_append(text)
-            print("Plantilla copiada al portapapeles y notas")
-        except Exception as e:
-            messagebox.showerror("Error", f"No se pudo copiar la plantilla: {e}", parent=self)
