@@ -52,20 +52,21 @@ def save_client(nombre, numero, sn, motivo, **kwargs):
         with conn.cursor() as cursor:
             # Intentamos insertar todas las columnas esperadas
             sql = ("INSERT INTO clientes (nombre, numero, sn, motivo_llamada, tipo_solicitud, motivo_solicitud, "
-                   "nombre_titular, dni, telefono_contacto, telefono_afectado, accion_ofrecida, otros_motivo, notas) "
-                   "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)")
+                   "nombre_titular, dni, telefono_contacto, telefono_afectado, accion_ofrecida, otros_motivo, notas, session_id) "
+                   "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)")
             params = (
                 nombre, numero, sn, motivo,
                 kwargs.get('tipo_solicitud'), kwargs.get('motivo_solicitud'),
                 kwargs.get('nombre_titular'), kwargs.get('dni'),
                 kwargs.get('telefono_contacto'), kwargs.get('telefono_afectado'),
-                kwargs.get('accion_ofrecida'), kwargs.get('otros_motivo'), kwargs.get('notas')
+                kwargs.get('accion_ofrecida'), kwargs.get('otros_motivo'), kwargs.get('notas'), kwargs.get('session_id')
             )
             try:
                 cursor.execute(sql, params)
             except Exception as e:
-                # Si falla (p. ej. columna notas no existe), intentamos un INSERT más pequeño que no incluya notas
+                # Si falla (p. ej. columna notas o session_id no existe), intentamos un INSERT de compatibilidad
                 try:
+                    # Versión más pequeña: sin 'notas' ni 'session_id' para compatibilidad con esquemas antiguos
                     sql2 = ("INSERT INTO clientes (nombre, numero, sn, motivo_llamada, tipo_solicitud, motivo_solicitud, "
                             "nombre_titular, dni, telefono_contacto, telefono_afectado, accion_ofrecida, otros_motivo) "
                             "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)")
@@ -77,10 +78,41 @@ def save_client(nombre, numero, sn, motivo, **kwargs):
                         kwargs.get('accion_ofrecida'), kwargs.get('otros_motivo')
                     )
                     cursor.execute(sql2, params2)
-                except Exception as e2:
-                    # Re-raise the original or new exception for the caller to handle/log
+                except Exception:
+                    # Re-raise para que el caller vea el error original
                     raise
             client_id = cursor.lastrowid
+            # Intentar insertar detalles específicos por motivo en tablas auxiliares si existen
+            try:
+                if motivo and motivo.lower().startswith('retenci'):
+                    # campos: tipo_solicitud, motivo_solicitud, nombre_titular, dni, telefono_contacto, telefono_afectado, accion_ofrecida, otros_motivo
+                    try:
+                        cursor.execute(
+                            "INSERT INTO clientes_retencion (cliente_id, tipo_solicitud, motivo_solicitud, nombre_titular, dni, telefono_contacto, telefono_afectado, accion_ofrecida, otros_motivo) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                            (client_id, kwargs.get('tipo_solicitud'), kwargs.get('motivo_solicitud'), kwargs.get('nombre_titular'), kwargs.get('dni'), kwargs.get('telefono_contacto'), kwargs.get('telefono_afectado'), kwargs.get('accion_ofrecida'), kwargs.get('otros_motivo'))
+                        )
+                    except Exception:
+                        # ignorar si tabla no existe o falla
+                        pass
+                elif 'cuestionamiento' in (motivo or '').lower():
+                    try:
+                        cursor.execute(
+                            "INSERT INTO clientes_cuestionamiento (cliente_id, submotivo, servicios_facturados, informacion_entregada, sn, otros_observaciones) VALUES (%s,%s,%s,%s,%s,%s)",
+                            (client_id, kwargs.get('submotivo'), kwargs.get('servicios_facturados'), kwargs.get('informacion_entregada'), sn, kwargs.get('otros_observaciones'))
+                        )
+                    except Exception:
+                        pass
+                elif 'técnica' in (motivo or '').lower() or 'tecnica' in (motivo or '').lower():
+                    try:
+                        cursor.execute(
+                            "INSERT INTO clientes_tecnica (cliente_id, linea_afectada, linea_adicional, inconveniente_reportado) VALUES (%s,%s,%s,%s)",
+                            (client_id, kwargs.get('linea_afectada') or numero, kwargs.get('linea_adicional'), kwargs.get('inconveniente_reportado'))
+                        )
+                    except Exception:
+                        pass
+            except Exception:
+                # no bloquear por detalles
+                pass
         conn.commit()
         return client_id
     finally:

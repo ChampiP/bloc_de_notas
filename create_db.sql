@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS clientes (
     numero VARCHAR(50),
     sn VARCHAR(100),
     motivo_llamada TEXT,
+    notas TEXT,
     tipo_solicitud VARCHAR(255),
     motivo_solicitud TEXT,
     nombre_titular VARCHAR(255),
@@ -16,7 +17,8 @@ CREATE TABLE IF NOT EXISTS clientes (
     telefono_afectado VARCHAR(50),
     accion_ofrecida TEXT,
     otros_motivo TEXT,
-    fecha_llamada TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    fecha_llamada TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    session_id VARCHAR(64)
 );
 
 CREATE TABLE IF NOT EXISTS tnps (

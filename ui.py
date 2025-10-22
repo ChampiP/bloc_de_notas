@@ -75,6 +75,15 @@ class App:
         self.standup_timer_id = None; self.last_client_id = None; self.tnps_registros = []
         self.current_theme = 'modern'; self.clipboard_history = []; self.last_clip_text = ''
         self.clip_mode = 'preguntar'; self.session = {'id': None, 'start': None, 'active': False}
+        # Generar session_id único para la sesión actual (se mantiene hasta 'Limpiar')
+        try:
+            import uuid
+            self.session['id'] = str(uuid.uuid4())
+            self.session['start'] = time.time()
+            self.session['active'] = True
+        except Exception:
+            # fallback a None si uuid no está disponible
+            self.session['id'] = None
         self.nombre_var = tk.StringVar(); self.numero_var = tk.StringVar(); self.sn_var = tk.StringVar()
         self.dni_var = tk.StringVar(); self.timer_var = tk.StringVar(value="00:00"); self.db_status_var = tk.StringVar(value="DB: ?")
         self.motivo_var = tk.StringVar(value="Selecciona motivo..."); self.tnps_var = tk.StringVar()
@@ -104,20 +113,30 @@ class App:
         except Exception as cred_err: print(f"[WARNING] No se pudo asegurar tabla de credenciales: {cred_err}")
 
     def _create_widgets(self):
-        self._create_header(); self._create_scrollable_area(); self._create_client_form()
+        self._create_header(); self._create_scrollable_area()
+        # Crear la seccion de flags/checks (compacta) arriba para acceso rápido
+        self._create_flags_section()
+        self._create_client_form()
         self._create_call_reason_section(); self._create_action_buttons(); self._create_notes_section()
         self._create_tnps_section(); self._create_theme_button(); self._initialize_modal_manager()
 
     def _create_header(self):
         header_frame = ttk.Frame(self.root); header_frame.pack(fill="x", padx=8, pady=(8,0))
         creds_frame = ttk.Frame(header_frame); creds_frame.pack(side='right')
-        self._create_icon_button(creds_frame, 'lista', '📄', lambda: self.modal_manager.open_lista_atenciones_modal()).pack(side='right', padx=(4,2))
-        self._create_icon_button(creds_frame, 'vpn', '🔒', lambda: self._copy_credential('vpn_password', 'VPN')).pack(side='right', padx=(2,0))
-        self._create_icon_button(creds_frame, 'siac', '🔑', lambda: self._copy_credential('siac_password', 'SIAC')).pack(side='right', padx=(2,0))
-        self._create_icon_button(creds_frame, 'edit', '✏️', lambda: self.modal_manager.open_credentials_modal()).pack(side='right', padx=(2,6))
-        self._create_icon_button(creds_frame, 'excel_close', '🗙', self._close_all_excel).pack(side='right', padx=(6,2))
-        ttk.Checkbutton(creds_frame, text='Auto', variable=self.clipboard_watcher_on).pack(side='right', padx=(6,2))
-        ttk.Button(creds_frame, text='📎', width=3, command=self._apply_last_clip).pack(side='right', padx=(4,2))
+        # Botones notorios para acciones secundarias (VPN, SIAC, Editar credenciales, Cerrar Excel)
+        try:
+            accent = Config.THEMES[self.current_theme]['accent']
+        except Exception:
+            accent = '#0d6efd'
+        # estilo temporal para botones notorios (más compactos)
+        # reducimos padding y fijamos un ancho corto para que sean menos largos
+        self.style.configure('Accent.TButton', background=accent, foreground=Config.Colors.WHITE, relief='flat', padding=(4,4))
+        # Botón para ver registros (lista de atenciones) - restaurado a la izquierda
+        ttk.Button(header_frame, text='📋', style='Accent.TButton', width=3, command=lambda: self.modal_manager.open_lista_atenciones_modal()).pack(side='left', padx=(0,6))
+        ttk.Button(creds_frame, text='🔒', style='Accent.TButton', width=3, command=lambda: self._copy_credential('vpn_password', 'VPN')).pack(side='right', padx=(4,2))
+        ttk.Button(creds_frame, text='🔑', style='Accent.TButton', width=3, command=lambda: self._copy_credential('siac_password', 'SIAC')).pack(side='right', padx=(4,2))
+        ttk.Button(creds_frame, text='✏️', style='Accent.TButton', width=3, command=lambda: self.modal_manager.open_credentials_modal()).pack(side='right', padx=(4,2))
+        ttk.Button(creds_frame, text='🗙', style='Accent.TButton', width=3, command=self._close_all_excel).pack(side='right', padx=(4,6))
         top_frame = ttk.Frame(self.root); top_frame.pack(fill="x", pady=(4,8), padx=8)
         theme_colors = Config.THEMES[self.current_theme]
         saludo_bg_frame = tk.Frame(top_frame, bg=theme_colors['saludo_bg'], bd=0); saludo_bg_frame.pack(side='left', padx=(0,4))
@@ -137,9 +156,10 @@ class App:
         ttk.Label(self.scrollable_frame, text="Datos del Cliente", font=Config.Fonts.H1).pack(anchor='w', padx=8, pady=(4,2))
         form_container = ttk.Frame(self.scrollable_frame); form_container.pack(fill="both", expand=True, pady=(0,8), padx=8)
         form_frame = ttk.Frame(form_container); form_frame.pack(fill="x"); form_frame.grid_columnconfigure(1, weight=1)
-        self.nombre_entry = self._create_form_row(form_frame, 0, "Nombre:", self.nombre_var)
-        self.numero_entry = self._create_form_row(form_frame, 1, "Número:", self.numero_var)
-        self.sn_entry = self._create_form_row(form_frame, 2, "SN:", self.sn_var)
+        # Reordenado: primero Teléfono, luego SN, luego Nombre, por último DNI
+        self.numero_entry = self._create_form_row(form_frame, 0, "Número:", self.numero_var)
+        self.sn_entry = self._create_form_row(form_frame, 1, "SN:", self.sn_var)
+        self.nombre_entry = self._create_form_row(form_frame, 2, "Nombre:", self.nombre_var)
         self.dni_entry = self._create_form_row(form_frame, 3, "DNI:", self.dni_var)
 
     def _create_form_row(self, parent, row, label_text, variable):
@@ -195,7 +215,6 @@ class App:
         frame = ttk.Frame(self.scrollable_frame); frame.pack(fill="x", pady=(4,10), padx=8)
         ttk.Button(frame, text="Agregar Cliente", command=self._add_client).pack(side="left", padx=(0,10))
         ttk.Button(frame, text="Limpiar", command=self._clear_form).pack(side="left")
-        ttk.Button(frame, text="Motivo Genérico", command=self._open_detalles_generico).pack(side="left", padx=(10,0))
 
     def _create_notes_section(self):
         ttk.Label(self.scrollable_frame, text="Notas", font=Config.Fonts.H1).pack(anchor='w', padx=8, pady=(4,2))
@@ -228,7 +247,8 @@ class App:
         self.scrollable_frame.bind("<Configure>", self._on_frame_configure); self.canvas.bind("<Configure>", self._on_canvas_configure)
         self.canvas.bind("<Enter>", self._bind_mousewheel_to_canvas); self.canvas.bind("<Leave>", self._unbind_mousewheel_from_canvas)
         self.nombre_var.trace_add("write", self._update_saludo); self.numero_var.trace_add("write", lambda *a: self._start_timer())
-        self.motivo_combo.bind("<<ComboboxSelected>>", self._update_template); self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+    # No autosave al cambiar motivo: el guardado se hace solo con el botón 'Limpiar'
+        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
     def _start_background_tasks(self):
         self._check_db_status(); self._clipboard_watcher(); self._start_standup_reminder(); self._update_template()
@@ -283,6 +303,29 @@ class App:
         img = self._load_icon(icon_name)
         return ttk.Button(parent, image=img, command=command, style='Copy.TButton') if img else ttk.Button(parent, text=emoji_text, command=command, style='Copy.TButton')
 
+    def _create_flags_section(self):
+        # Seccion compacta con checkbuttons: saludo, sondeo, empatia, titularidad, oferta, proceso, encuesta
+        container = ttk.Frame(self.scrollable_frame)
+        container.pack(fill="x", padx=8, pady=(4,6))
+        # usar una fuente mas pequeña
+        small_font = Config.Fonts.COPY_BUTTON
+        flags = [
+            ("Saludo", self.saludo_var),
+            ("Sondeo", self.sondeo_var),
+            ("Empatía", self.empatia_var),
+            ("Titularidad", self.titularidad_var),
+            ("Oferta", self.oferta_var),
+            ("Proceso", self.proceso_var),
+            ("Encuesta", self.encuesta_var),
+        ]
+        # distribuir en dos filas si es necesario para mantener compacto
+        row1 = ttk.Frame(container); row1.pack(fill='x')
+        row2 = ttk.Frame(container); row2.pack(fill='x')
+        for i, (label, var) in enumerate(flags):
+            parent = row1 if i < 4 else row2
+            cb = ttk.Checkbutton(parent, text=label, variable=var)
+            cb.pack(side='left', padx=(4,6), pady=2)
+
     def _on_frame_configure(self, event): self.canvas.configure(scrollregion=self.canvas.bbox("all"))
     def _on_canvas_configure(self, event): self.canvas.itemconfigure(self.window_id, width=event.width); self.canvas.configure(scrollregion=self.canvas.bbox("all"))
     def _on_mousewheel(self, event): self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
@@ -317,23 +360,118 @@ class App:
                 else: self.modal_manager.open_cuestionamiento_modal()
             elif open_modal:
                 def guard_cb(extra_notas):
-                    notas = (self.template_text.get(1.0, tk.END).strip() + '\n' + extra_notas).strip()
-                    try:
-                        save_client(nombre, self.numero_var.get(), self.sn_var.get(), motivo, dni=self.dni_var.get(), notas=notas)
+                        # Si el motivo es genérico, reemplazar exactamente con lo enviado por el modal
+                        try:
+                            motivo_norm = (motivo or '').strip().lower()
+                        except Exception:
+                            motivo_norm = ''
+                        if motivo_norm in ('otros', 'motivo generico', 'motivo genérico', 'motivo generico'.lower()):
+                            notas = extra_notas.strip()
+                        else:
+                            notas = (self.template_text.get(1.0, tk.END).strip() + '\n' + extra_notas).strip()
+                        # No guardar aún: solo actualizar la plantilla para que se conserve hasta 'Limpiar'
+                        template_text = self.template_text
+                        if template_text is not None:
+                            template_text.delete(1.0, tk.END)
+                            template_text.insert(tk.END, notas)
                         self._stop_timer(); self._update_template()
-                    except Exception as e:
-                        messagebox.showerror("Error", f"Error al guardar cliente: {e}")
                 self.modal_manager.open_motivo_modal(motivo, guard_cb)
             else:
                 try:
-                    self.last_client_id = save_client(nombre, self.numero_var.get(), self.sn_var.get(), motivo, dni=self.dni_var.get(), notas=self.template_text.get(1.0, tk.END).strip())
+                    # En modo "rápido" no guardamos ahora; solo preparamos la plantilla y mantenemos datos en el formulario
                     self._stop_timer(); self._update_template()
-                except Exception as e: messagebox.showerror("Error", f"Error al guardar cliente: {e}")
+                except Exception as e: messagebox.showerror("Error", f"Error interno: {e}")
 
     def _clear_form(self):
-        if self.nombre_var.get() and self.motivo_var.get() != "Selecciona motivo...": self._add_client(open_modal=False)
-        self.nombre_var.set(""); self.numero_var.set(""); self.sn_var.set(""); self.dni_var.set("")
-        self.motivo_var.set("Selecciona motivo..."); self.template_text.delete(1.0, tk.END)
+        # Guardar los datos actuales antes de limpiar. Se guarda si hay cualquier dato en los campos
+        try:
+            nombre = self.nombre_var.get().strip()
+            numero = self.numero_var.get().strip()
+            sn = self.sn_var.get().strip()
+            dni = self.dni_var.get().strip()
+            motivo = self.motivo_var.get()
+            notas_base = self.template_text.get(1.0, tk.END).strip()
+
+            should_save = any([nombre, numero, sn, dni, notas_base]) or (motivo and motivo != "Selecciona motivo...")
+            if should_save:
+                # Construir notas completas incluyendo metadatos del formulario
+                meta_lines = []
+                # Temporizador
+                try:
+                    meta_lines.append(f"Duracion llamada: {self.timer_var.get()}")
+                except Exception:
+                    pass
+                # Checkboxes y flags relevantes
+                try:
+                    flags = {
+                        'saludo': getattr(self, 'saludo_var', None),
+                        'sondeo': getattr(self, 'sondeo_var', None),
+                        'empatia': getattr(self, 'empatia_var', None),
+                        'titularidad': getattr(self, 'titularidad_var', None),
+                        'oferta': getattr(self, 'oferta_var', None),
+                        'proceso': getattr(self, 'proceso_var', None),
+                        'encuesta': getattr(self, 'encuesta_var', None),
+                    }
+                    for k, v in flags.items():
+                        if isinstance(v, tk.BooleanVar):
+                            meta_lines.append(f"{k}: {'SI' if v.get() else 'NO'}")
+                except Exception:
+                    pass
+
+                # Adjuntar otros datos útiles
+                meta_lines.append(f"Motivo seleccionado: {motivo if motivo else ''}")
+                meta_lines.append(f"SN: {sn}")
+                meta_lines.append(f"DNI: {dni}")
+                meta_lines.append(f"Numero: {numero}")
+
+                notas_full = notas_base
+                if notas_full:
+                    notas_full = notas_full + "\n\n--- METADATOS ---\n" + "\n".join(meta_lines)
+                else:
+                    notas_full = "--- METADATOS ---\n" + "\n".join(meta_lines)
+
+                # El esquema requiere `nombre NOT NULL` — si no hay nombre, usar un placeholder razonable
+                nombre_save = nombre if nombre else 'Sin nombre'
+                motivo_save = motivo if motivo and motivo != "Selecciona motivo..." else 'Sin motivo'
+                try:
+                    session_id_val = self.session.get('id') if getattr(self, 'session', None) else None
+                    self.last_client_id = save_client(nombre_save, numero or None, sn or None, motivo_save, dni=dni or None, notas=notas_full, session_id=session_id_val)
+                except Exception as e:
+                    # Mostrar error pero permitir que el limpiado continúe
+                    try:
+                        messagebox.showerror("Error", f"Error al guardar cliente antes de limpiar: {e}")
+                    except Exception:
+                        print(f"Error al mostrar dialogo de error: {e}")
+        except Exception as exc:
+            print(f"[WARNING] Error al intentar guardar antes de limpiar: {exc}")
+
+        # Limpiar campos del formulario
+        self.nombre_var.set("")
+        self.numero_var.set("")
+        self.sn_var.set("")
+        self.dni_var.set("")
+        self.motivo_var.set("Selecciona motivo...")
+        try:
+            self.template_text.delete(1.0, tk.END)
+        except Exception:
+            pass
+
+        # Deseleccionar flags/checks
+        try:
+            for v in (self.saludo_var, self.sondeo_var, self.empatia_var, self.titularidad_var, self.oferta_var, self.proceso_var, self.encuesta_var):
+                if isinstance(v, tk.BooleanVar):
+                    v.set(False)
+        except Exception:
+            pass
+
+        # Iniciar nueva sesión (marcar inicio de sesión en este punto)
+        try:
+            self.session['id'] = None
+            self.session['start'] = time.time()
+            self.session['active'] = True
+        except Exception:
+            pass
+
         self._stop_timer(); self._update_template()
 
     def _update_template(self, event=None):
@@ -341,6 +479,8 @@ class App:
         if motivo == 'Atención técnica': self.modal_manager.open_tecnica_modal(); return
         if motivo not in ["Retención", "Cuestionamiento de recibo"]:
             self.template_text.delete(1.0, tk.END); self.template_text.insert(tk.END, templates.get(motivo, ""))
+
+    # Autosave al cambiar motivo eliminado: el guardado solo ocurre con el botón 'Limpiar'.
 
     def _get_normalized_motivos(self):
         motivo_values = list(templates.keys());

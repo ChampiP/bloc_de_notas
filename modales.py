@@ -137,31 +137,15 @@ class RetencionModal(BaseModal):
             if motivo == 'Otros':
                 motivo = self.motivo_otro_var.get()
             plantilla = f"SN: {self.sn_modal_var.get()}\nTipo de Solicitud: {self.tipo_solicitud_var.get()}\nMotivo de Solicitud: {motivo}\nNombre del titular: {self.nombre_titular_var.get()}\nDNI: {self.dni_modal_var.get()}\nTeléfono de contacto: {self.tel_contacto_var.get()}\nTeléfono afectado: {self.tel_afectado_var.get()}\nAcción ofrecida: {self.accion_var.get()}"
-        try:
-            self.save_client_func(
-                self.vars['nombre_var'].get(),
-                self.vars['numero_var'].get(),
-                self.vars['sn_var'].get(),
-                'Retención',
-                tipo_solicitud=self.tipo_solicitud_var.get(),
-                motivo_solicitud=self.motivo_solicitud_var.get(),
-                nombre_titular=self.nombre_titular_var.get(),
-                dni=self.dni_modal_var.get(),
-                telefono_contacto=self.tel_contacto_var.get(),
-                telefono_afectado=self.tel_afectado_var.get(),
-                accion_ofrecida=self.accion_var.get(),
-                notas=plantilla
-            )
-            template_text = self.ctx.get('template_text')
-            if template_text:
-                template_text.delete(1.0, tk.END)
-                template_text.insert(tk.END, plantilla)
-                self.root.clipboard_clear()
-                self.root.clipboard_append(plantilla)
-            print('Retención guardada y plantilla copiada al portapapeles')
-            self.destroy()
-        except Exception as e:
-            messagebox.showerror('Error', f'No se pudo guardar retención: {e}', parent=self)
+        # En la nueva lógica, no guardamos directamente desde el modal.
+        template_text = self.ctx.get('template_text')
+        if template_text:
+            template_text.delete(1.0, tk.END)
+            template_text.insert(tk.END, plantilla)
+            self.root.clipboard_clear()
+            self.root.clipboard_append(plantilla)
+        print('Retención preparada en plantilla y copiada al portapapeles')
+        self.destroy()
 
 class CuestionamientoModal(BaseModal):
     def __init__(self, parent, ctx):
@@ -233,13 +217,15 @@ class CuestionamientoModal(BaseModal):
             final = self.otros_text.get(1.0, tk.END).strip()
             if not final: messagebox.showwarning('Validación', 'Ingresa la acción tomada o la observación', parent=self); return
             motivo = f'Cuestionamiento de recibo - {self.submotivo_var.get()}'
-        try:
-            self.save_client_func(self.vars['nombre_var'].get(), self.vars['numero_var'].get(), self.vars['sn_var'].get(), motivo, dni=self.vars['dni_var'].get(), notas=final)
-            template_text = self.ctx.get('template_text');
-            if template_text: template_text.delete(1.0, tk.END); template_text.insert(tk.END, final); self.root.clipboard_clear(); self.root.clipboard_append(final)
-            print('Registro guardado y plantilla copiada al portapapeles'); self.destroy()
-        except Exception as e:
-            messagebox.showerror('Error', f'No se pudo guardar: {e}', parent=self)
+        # No guardar desde el modal: solo actualizar plantilla para que se guarde al limpiar
+        template_text = self.ctx.get('template_text')
+        if template_text:
+            template_text.delete(1.0, tk.END)
+            template_text.insert(tk.END, final)
+            self.root.clipboard_clear()
+            self.root.clipboard_append(final)
+        print('Registro preparado en plantilla y copiado al portapapeles')
+        self.destroy()
 
 class TecnicaModal(BaseModal):
     def __init__(self, parent, ctx):
@@ -269,13 +255,14 @@ class TecnicaModal(BaseModal):
         if not self.nombre_tec_var.get().strip() or not self.linea_var.get().strip(): messagebox.showwarning('Validación', 'El nombre y la línea son obligatorios', parent=self); return
         linea_add = self.linea_add_var.get().strip()
         final = f"Nombre del cliente: {self.nombre_tec_var.get().strip()}\nLínea afectada: {self.linea_var.get().strip()}\nInconveniente reportado: {self.tec_var.get()}" + (f"\n*Línea adicional: {linea_add}" if linea_add else "")
-        try:
-            self.save_client_func(self.nombre_tec_var.get(), self.linea_var.get(), self.vars['sn_var'].get(), 'Atención Técnica', dni=self.vars['dni_var'].get(), notas=final)
-            template_text = self.ctx.get('template_text');
-            if template_text: template_text.delete(1.0, tk.END); template_text.insert(tk.END, final); self.root.clipboard_clear(); self.root.clipboard_append(final)
-            print('Atención Técnica guardada y plantilla copiada'); self.destroy()
-        except Exception as e:
-            messagebox.showerror('Error', f'No se pudo guardar: {e}', parent=self)
+        # No guardar desde el modal: solo actualizar la plantilla hasta que el usuario presione 'Limpiar'
+        template_text = self.ctx.get('template_text')
+        if template_text:
+            template_text.delete(1.0, tk.END)
+            template_text.insert(tk.END, final)
+            self.root.clipboard_clear()
+            self.root.clipboard_append(final)
+        print('Atención Técnica preparada en plantilla y copiada'); self.destroy()
 
 class CredentialsModal(BaseModal):
     def __init__(self, parent, ctx):
@@ -341,21 +328,73 @@ class MotivoModal(BaseModal):
     def __init__(self, parent, ctx, motivo, on_save_callback):
         super().__init__(parent, f"Detalles para: {motivo}", ctx)
         self.on_save_callback = on_save_callback
+        self.motivo = motivo
         self._create_widgets()
         self._set_initial_geometry(width=324)
 
     def _create_widgets(self):
         self.grid_columnconfigure(0, weight=1); self.grid_rowconfigure(1, weight=1)
-        ttk.Label(self, text="Detalles Adicionales:").grid(row=0, column=0, sticky='w', padx=12, pady=(8,4))
-        self.extra_text = tk.Text(self, height=8, wrap='word'); self.extra_text.grid(row=1, column=0, sticky='nsew', padx=12, pady=4)
-        btns = ttk.Frame(self); btns.grid(row=2, column=0, sticky='e', pady=8, padx=12)
-        ttk.Button(btns, text='Guardar', command=self._save).pack(side='right', padx=(4,0))
-        ttk.Button(btns, text='Cancelar', command=self.destroy).pack(side='right')
+        motivo_norm = (self.motivo or '').strip().lower()
+        # Si el motivo es genérico/otros, mostrar formulario con dos campos y SN auto-rellenado
+        if motivo_norm in ('otros', 'motivo generico', 'motivo genérico', 'motivo generico'.lower()):
+            ttk.Label(self, text="motivo de consulta:").grid(row=1, column=0, sticky='w', padx=12, pady=(4,2))
+            self.motivo_consulta_var = tk.StringVar()
+            ttk.Entry(self, textvariable=self.motivo_consulta_var).grid(row=2, column=0, sticky='ew', padx=12)
+
+            ttk.Label(self, text="informacion brindada:").grid(row=3, column=0, sticky='w', padx=12, pady=(8,2))
+            self.informacion_var = tk.StringVar()
+            ttk.Entry(self, textvariable=self.informacion_var).grid(row=4, column=0, sticky='ew', padx=12)
+
+            sn_val = ''
+            try:
+                sn_var = self.ctx.get('sn_var')
+                if sn_var and hasattr(sn_var, 'get'):
+                    sn_val = sn_var.get() or ''
+            except Exception:
+                sn_val = ''
+            ttk.Label(self, text=f"sn: {sn_val}").grid(row=5, column=0, sticky='w', padx=12, pady=(8,4))
+
+            btns = ttk.Frame(self); btns.grid(row=6, column=0, sticky='e', pady=8, padx=12)
+            ttk.Button(btns, text='Guardar', command=self._save).pack(side='right')
+            # No mostrar botón Cancelar para motivo genérico (según solicitud)
+        else:
+            ttk.Label(self, text="Detalles Adicionales:").grid(row=0, column=0, sticky='w', padx=12, pady=(8,4))
+            self.extra_text = tk.Text(self, height=8, wrap='word'); self.extra_text.grid(row=1, column=0, sticky='nsew', padx=12, pady=4)
+            btns = ttk.Frame(self); btns.grid(row=2, column=0, sticky='e', pady=8, padx=12)
+            ttk.Button(btns, text='Guardar', command=self._save).pack(side='right', padx=(4,0))
+            ttk.Button(btns, text='Cancelar', command=self.destroy).pack(side='right')
 
     def _save(self):
-        extra = self.extra_text.get(1.0, tk.END).strip()
-        self.on_save_callback(extra)
-        self.destroy()
+        # Support two modes: older extra_text Text widget, or the new 'motivo genérico' small form
+        try:
+            if hasattr(self, 'extra_text'):
+                extra = self.extra_text.get(1.0, tk.END).strip()
+            else:
+                # build from motivo_consulta_var, informacion_var and sn
+                motivo_consulta = (getattr(self, 'motivo_consulta_var', tk.StringVar(value='')).get() or '').strip()
+                informacion = (getattr(self, 'informacion_var', tk.StringVar(value='')).get() or '').strip()
+                sn_val = ''
+                try:
+                    sn_var = self.ctx.get('sn_var')
+                    if sn_var and hasattr(sn_var, 'get'):
+                        sn_val = sn_var.get() or ''
+                except Exception:
+                    sn_val = ''
+                extra = f"motivo de consulta: {motivo_consulta}\ninformacion brindada : {informacion}\nsn:{sn_val}"
+            # Copy to clipboard
+            try:
+                self.root.clipboard_clear()
+                self.root.clipboard_append(extra)
+            except Exception:
+                pass
+            # Call the provided callback so the main app shows it in the notes
+            try:
+                self.on_save_callback(extra)
+            except Exception:
+                # If callback fails, still close
+                pass
+        finally:
+            self.destroy()
 class ModalManager:
     def __init__(self, root, ctx):
         self.root = root
