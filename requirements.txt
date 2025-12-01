@@ -1,0 +1,4 @@
+# Dependencias del proyecto Bloc de Notas
+# SQLite viene incluido con Python, no requiere instalación adicional
+
+plyer>=2.0.0
